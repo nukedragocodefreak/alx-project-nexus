@@ -33,7 +33,7 @@ const {
   Danger
  } = Components;
 //--- Config ------------------------------------------------------------------------------------
-const TMDB_IMG_URL = "https://image.tmdb.org/t/p/w500";
+const TMDB_IMG_URL = process.env.NEXT_PUBLIC_TMDB_IMAGE_BASE_URL || "https://image.tmdb.org/t/p/w500";
 const FALLBACK_POSTER = "https://images.unsplash.com/photo-1496440737103-cd596325d314?q=80&w=1200&auto=format&fit=crop";
 const GENRES_UI = [
   "Action",
@@ -66,10 +66,11 @@ export default function MovieRecommendationsUI() {
   const [genresDict, setGenresDict] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+  const base = process.env.NEXT_PUBLIC_TMDB_API_BASE_URL || "https://api.themoviedb.org/3";  
+  const key = process.env.NEXT_PUBLIC_TMDB_READACCESS_API_KEY;
     // Load TMDb genre dictionary once (for mapping genre_ids -> names)
   useEffect(() => {
-    fetchJSON("/api/tmdb?fn=genres")
+    fetchJSON(`${base}/movie/popular`)
       .then((data) => {
         const dict: Record<number, string> = {};
         data.genres?.forEach((g: { id: number; name: string }) => (dict[g.id] = g.name));
@@ -85,10 +86,10 @@ export default function MovieRecommendationsUI() {
       setLoading(true);
       setError(null);
       try {
-        let url = "/api/tmdb?fn=popular";
-        if (tab === "trending") url = "/api/tmdb?fn=trending";
-        if (query.trim()) url = `/api/tmdb?fn=search&q=${encodeURIComponent(query.trim())}`;
-        const json = await fetchJSON(url, { signal: controller.signal });
+        let url = `${base}/api/tmdb?fn=popular`;
+        if (tab === "trending") url = `${base}/api/tmdb?fn=trending`;
+        if (query.trim()) url = `${base}/api/tmdb?fn=search&q=${encodeURIComponent(query.trim())}`;
+        const json = await fetchJSON(url, { signal: controller.signal }, key);
         const list: UiMovie[] = (json.results || []).map((m: TmdbMovie) => ({
           id: String(m.id),
           title: m.title || m.name || "Untitled",
