@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
-import theme, { Components } from "@/styles/theme";
+import theme, { Components } from "@/components/theme";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, SlidersHorizontal, Sparkles, Star, Film, Heart, Plus, Info, Play, Clock, X } from "lucide-react";
+import { Search, SlidersHorizontal, Sparkles, Film, Clock, X } from "lucide-react";
 import type { TmdbMovie, UiMovie } from "../types"; 
 import { fetchJSON } from "@/Utils/index";
 import MovieCard from "@/components/MovieCard";
@@ -56,7 +56,7 @@ const GENRES_UI = [
 
 export default function MovieRecommendationsUI() {
   const [query, setQuery] = useState("");
-  const [minRating, setMinRating] = useState([7]);
+  const [minRating, setMinRating] = useState(7);
   const [activeGenres, setActiveGenres] = useState<string[]>([]);
   const [tab, setTab] = useState("for-you");
   const [watchlist, setWatchlist] = useState<string[]>([]);

@@ -1,6 +1,6 @@
 import React from "react";
 import { Star, Heart, Plus, Info } from "lucide-react";
-import theme, { Components } from "@/styles/theme";
+import theme, { Components } from "@/components/theme";
 import { truncate } from "@/Utils/index";
 import { MovieCardProps } from "@/interfaces";
 const { Card, CardBody, PosterWrap, Poster, Overlay, YearBadge, Tiny, Button } = Components;

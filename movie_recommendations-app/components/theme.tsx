@@ -1,5 +1,29 @@
-import styled, { createGlobalStyle, css } from "styled-components";
-const theme = {
+import styled, { createGlobalStyle, css, DefaultTheme } from "styled-components";
+
+// Extend DefaultTheme to include your custom theme properties
+import "styled-components";
+
+declare module "styled-components" {
+  export interface DefaultTheme {
+    radius: number;
+    shadow: string;
+    colors: {
+      bg: string;
+      surface: string;
+      border: string;
+      text: string;
+      subtext: string;
+      accent: string;
+      muted: string;
+      badge: string;
+      dangerBg: string;
+      dangerBorder: string;
+      dangerText: string;
+    };
+  }
+}
+
+const theme: DefaultTheme = {
   radius: 14,
   shadow: "0 2px 10px rgba(0,0,0,0.06)",
   colors: {
