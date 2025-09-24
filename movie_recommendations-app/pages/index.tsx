@@ -113,3 +113,8 @@ export default function Home() {
     </div>
   );
 }
+
+
+// import dynamic from "next/dynamic";
+// const App = dynamic(() => import("@/components/StyledTmdbRecs"), { ssr: false });
+// export default function Home(){ return <App/>; }
