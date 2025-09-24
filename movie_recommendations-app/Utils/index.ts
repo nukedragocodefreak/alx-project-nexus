@@ -5,12 +5,12 @@ export function truncate(text: string, n = 140): string {
 
 export async function fetchJSON<T = any>(
   url: string,
-  opts?: RequestInit,
+  opts: RequestInit = {},
   token?: string
 ): Promise<T> {
   const headers: Record<string, string> = {
     "Accept": "application/json",
-    ...(opts?.headers as Record<string, string>),
+    ...(opts.headers ? opts.headers as Record<string, string> : {}),
   };
 
   if (token) {
@@ -23,7 +23,8 @@ export async function fetchJSON<T = any>(
   });
 
   if (!res.ok) {
-    throw new Error(`HTTP ${res.status} - ${res.statusText}`);
+    const errorText = await res.text();
+    throw new Error(`HTTP ${res.status} - ${res.statusText}: ${errorText}`);
   }
 
   return res.json() as Promise<T>;
