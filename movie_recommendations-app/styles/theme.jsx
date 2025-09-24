@@ -154,4 +154,3 @@ export const Components = {
   Tiny,
   Danger
 };
-

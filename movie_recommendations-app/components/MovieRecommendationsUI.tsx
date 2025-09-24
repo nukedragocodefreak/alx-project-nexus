@@ -1,10 +1,37 @@
 import React, { useEffect, useMemo, useState } from "react";
-import styled, { ThemeProvider, createGlobalStyle, css } from "styled-components";
+import theme, { Components } from "@/styles/theme";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, SlidersHorizontal, Sparkles, Star, Film, Heart, Plus, Info, Play, Clock, X } from "lucide-react";
-import theme from "@/styles/theme";
 import type { TmdbMovie, UiMovie } from "../types"; 
 import { fetchJSON } from "@/Utils/index";
+import MovieCard from "@/components/MovieCard";
+const { 
+  HeaderWrap,
+  Container,
+  Brand,
+  AppBadge,
+  Muted,
+  Button,
+  InputWrap,
+  Input,
+  LeftIcon,
+  RightShortcuts,
+  Kbd,
+  Tabs,
+  TabBtn,
+  Main,
+  Card,
+  CardBody,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  SliderRow,
+  Range,
+  GenrePills,
+  Pill,
+  Grid,
+  Danger
+ } = Components;
 //--- Config ------------------------------------------------------------------------------------
 const TMDB_IMG_URL = "https://image.tmdb.org/t/p/w500";
 const FALLBACK_POSTER = "https://images.unsplash.com/photo-1496440737103-cd596325d314?q=80&w=1200&auto=format&fit=crop";
@@ -68,7 +95,7 @@ export default function MovieRecommendationsUI() {
           year: (m.release_date || m.first_air_date || "").slice(0, 4) || "—",
           genres: (m.genre_ids || []).map((gid) => genresDict[gid]).filter(Boolean),
           rating: Number((m.vote_average || 0).toFixed(1)),
-          poster: m.poster_path ? `${TMDB_IMG}${m.poster_path}` : FALLBACK_POSTER,
+          poster: m.poster_path ? `${TMDB_IMG_URL}${m.poster_path}` : FALLBACK_POSTER,
           overview: m.overview || "",
           trending: tab === "trending",
         }));
