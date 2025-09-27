@@ -217,8 +217,8 @@ export default function MovieRecommendationsUI() {
     async function load() {
       try {
         const [moviesResult, tvResult] = await Promise.allSettled([
-          fetchJSON("/api/tmdb?fn=genre_list&mediaType=movie"),
-          fetchJSON("/api/tmdb?fn=genre_list&mediaType=tv"),
+          fetchJSON<{ genres?: Array<{ id: number; name: string }> }>("/api/tmdb?fn=genre_list&mediaType=movie"),
+          fetchJSON<{ genres?: Array<{ id: number; name: string }> }>("/api/tmdb?fn=genre_list&mediaType=tv"),
         ]);
         if (cancelled) {
           return;
@@ -256,7 +256,7 @@ export default function MovieRecommendationsUI() {
     }
     setActiveGenres((prev) => prev.filter((genre) => Boolean(genreCache[feedMediaType].nameToId[genre])));
   }, [feedMediaType, genreCache]);
-  useEffect(() => { fetchJSON("/api/tmdb?fn=configuration").then((data: TmdbConfiguration) => { setConfiguration(data); }).catch((err: Error) => { setConfigurationError(err.message); }); }, []);
+  useEffect(() => { fetchJSON<TmdbConfiguration>("/api/tmdb?fn=configuration").then((data) => { setConfiguration(data); }).catch((err: Error) => { setConfigurationError(err.message); }); }, []);
   useEffect(() => {
     if (activeFeed !== "trending") {
       setTrendingMediaType(feedMediaType);
