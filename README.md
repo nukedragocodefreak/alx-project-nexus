@@ -1,47 +1,60 @@
+# Movie Recommendations App
 
-# 🎬 Movie Recommendation App
+An interactive Next.js and TypeScript application for exploring TMDb content, personalising feeds, and tracking favourites. The project doubles as a sandbox for modern frontend patterns, API orchestration, and developer experience tooling.
 
-A real-world **Next.js + TypeScript** application where users can browse trending movies, get recommendations, and save favorites.
+## Highlights
+- Personalised discovery feeds (popular, trending, now playing, upcoming, TV, watchlist, favourites).
+- Genre filtering, rating thresholds, search shortcuts, and TMDb details panels.
+- Local persistence for favourites and watchlists, plus keyboard-friendly UI flows.
+- Robust TMDb proxy with request/response logging, media-type switching, and API key masking.
 
-## 🚀 Features
-- Fetch trending and recommended movies from a public API.
-- Dynamic movie detail pages with Next.js routing.
-- Save & manage favorite movies (local storage / API backend).
-- Responsive and interactive movie dashboard.
+## Getting Started
 
-## 🛠️ Tech Stack
-- **Next.js / React Native** – server-side rendering & routing  
-- **TypeScript** – type safety  
-- **Styled Components** – styled UI components  
-
-## 📦 Setup
 ```bash
-git clone https://github.com/nukedragocodefreak/alx-project-nexus.git
-cd movie-recommendations-app
 npm install
-```
-
-Add a `.env.local` file:
-```
-NEXT_PUBLIC_MOVIE_API_KEY=your_api_key_here
-NEXT_PUBLIC_MOVIE_API_URL=https://api.themoviedb.org/3
-```
-
-Run the dev server:
-```bash
 npm run dev
 ```
 
-Visit **http://localhost:3000** 🎉
+Open http://localhost:3000 to start browsing and iterating.
 
-## 📌 Deployment
-- Deploy easily on **Vercel** or **Netlify**.
+## Environment Variables
 
-## ✅ Roadmap
-- Authentication (Google/GitHub login)  
-- AI-powered recommendations  
-- Offline mode (PWA)  
-- Extend to React Native mobile app  
+| Variable | Description |
+| --- | --- |
+| `NEXT_PUBLIC_TMDB_API_BASE_URL` | Override TMDb base URL (default `https://api.themoviedb.org/3`). |
+| `NEXT_PUBLIC_TMDB_API_KEY` | TMDb v3 API key (optional when using read access token). |
+| `TMDB_API_KEY` | Server-side only v3 API key fallback. |
+| `NEXT_PUBLIC_TMDB_READACCESS_API_KEY` | TMDb v4 read access token (recommended). |
+| `TMDB_READACCESS_API_KEY` | Server-side only read access fallback. |
+| `NEXT_PUBLIC_TMDB_LOG_REQUESTS` / `TMDB_LOG_REQUESTS` | Enable proxy request/response logging when set to `true`. |
 
----
-Made with ❤️ using Next.js & TypeScript.
+> When working behind a proxy that re-signs TLS traffic, either install the proxy CA (via `NODE_EXTRA_CA_CERTS`) or fall back to the native `fetch` implementation to avoid TLS rejections.
+
+## Project Scripts
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the development server (Turbopack). |
+| `npm run build` | Create a production build. |
+| `npm run start` | Serve the production build. |
+| `npm run lint` | Run ESLint. |
+
+## Documentation
+
+| Document | Purpose |
+| --- | --- |
+| [`docs/project-overview.md`](docs/project-overview.md) | Architecture, UI/UX, and feature deep dive. |
+| [`docs/developer-setup.md`](docs/developer-setup.md) | Environment preparation, local workflows, and troubleshooting. |
+| [`docs/api/tmdb-proxy.md`](docs/api/tmdb-proxy.md) | TMDb proxy contract, logging, and media-type switching details. |
+| [`docs/api/endpoints.md`](docs/api/endpoints.md) | Frontend-visible endpoints and usage examples. |
+
+## Contributing
+
+1. Fork and clone the repository.
+2. Create a feature branch (`git checkout -b feature/my-update`).
+3. Run linting and relevant manual checks.
+4. Submit a descriptive pull request and link to any screenshots/videos.
+
+## License
+
+Distributed for educational use within the ALX Project Nexus programme. See project maintainers for reuse outside the cohort.
