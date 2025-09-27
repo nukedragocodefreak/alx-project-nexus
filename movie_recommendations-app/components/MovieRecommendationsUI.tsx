@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import theme, { Components } from "@/components/theme";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, SlidersHorizontal, Sparkles, Film, Clock, TrendingUp, Tv, Loader2, Heart, X } from "lucide-react";
+import { Search, SlidersHorizontal, Sparkles, Film, Clock, TrendingUp, Loader2, Heart, X } from "lucide-react";
 import type { TmdbMovie, UiMovie } from "@/types";
 import { fetchJSON } from "@/Utils/index";
 import MovieCard from "@/components/MovieCard";
@@ -11,7 +11,7 @@ const TMDB_IMG_URL = process.env.NEXT_PUBLIC_TMDB_IMAGE_BASE_URL || "https://ima
 const FALLBACK_POSTER = "https://images.unsplash.com/photo-1496440737103-cd596325d314?q=80&w=1200&auto=format&fit=crop";
 const FALLBACK_GENRES = ["Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary", "Drama", "Fantasy", "History", "Horror", "Mystery", "Romance", "Sci-Fi", "Thriller",];
 const FAVORITES_STORAGE_KEY = "scenescout:favorites:v1";
-type FeedId = "popular" | "trending" | "now_playing" | "upcoming" | "discover" | "tv_popular" | "favorites" | "watchlist" | "search";
+type FeedId = "popular" | "trending" | "now_playing" | "upcoming" | "discover" | "favorites" | "watchlist" | "search";
 type FeedConfig = {
   id: FeedId;
   label: string;
@@ -19,7 +19,7 @@ type FeedConfig = {
     size?: number;
   }>;
 };
-const FEEDS: FeedConfig[] = [{ id: "popular", label: "Popular", icon: Sparkles }, { id: "trending", label: "Trending", icon: TrendingUp }, { id: "now_playing", label: "Now Playing", icon: Clock }, { id: "upcoming", label: "Upcoming", icon: Film }, { id: "discover", label: "Discover", icon: SlidersHorizontal }, { id: "tv_popular", label: "TV", icon: Tv }, { id: "favorites", label: "Favorites", icon: Heart }, { id: "watchlist", label: "Watchlist", icon: Clock },];
+const FEEDS: FeedConfig[] = [{ id: "popular", label: "Popular", icon: Sparkles }, { id: "trending", label: "Trending", icon: TrendingUp }, { id: "now_playing", label: "Now Playing", icon: Clock }, { id: "upcoming", label: "Upcoming", icon: Film }, { id: "discover", label: "Discover", icon: SlidersHorizontal }, { id: "favorites", label: "Favorites", icon: Heart }, { id: "watchlist", label: "Watchlist", icon: Clock },];
 const TRENDING_MEDIA_TYPES: Array<{
   id: "movie" | "tv";
   label: string;
@@ -28,6 +28,17 @@ const TRENDING_WINDOWS: Array<{
   id: "day" | "week";
   label: string;
 }> = [{ id: "day", label: "Today" }, { id: "week", label: "This Week" },];
+type GenreState = {
+  dict: Record<number, string>;
+  nameToId: Record<string, number>;
+  names: string[];
+};
+
+const makeEmptyGenreState = (): GenreState => ({
+  dict: {},
+  nameToId: {},
+  names: [],
+});
 type SelectedItem = {
   id: string;
   mediaType: "movie" | "tv";
@@ -84,6 +95,7 @@ function formatYear(value?: string) {
 export default function MovieRecommendationsUI() {
   const [query, setQuery] = useState("");
   const [activeFeed, setActiveFeed] = useState<FeedId>("popular");
+  const [feedMediaType, setFeedMediaType] = useState<"movie" | "tv">("movie");
   const [minRating, setMinRating] = useState(7);
   const [activeGenres, setActiveGenres] = useState<string[]>([]);
   const [watchlist, setWatchlist] = useState<string[]>([]);
@@ -92,9 +104,12 @@ export default function MovieRecommendationsUI() {
   const favoritesReadyRef = useRef(false);
   const [movies, setMovies] = useState<UiMovie[]>([]);
   const [catalog, setCatalog] = useState<Record<string, UiMovie>>({});
-  const [genresDict, setGenresDict] = useState<Record<number, string>>({});
   const [genreNameToId, setGenreNameToId] = useState<Record<string, number>>({});
   const [genreChoices, setGenreChoices] = useState<string[]>(FALLBACK_GENRES);
+  const [genreCache, setGenreCache] = useState<Record<"movie" | "tv", GenreState>>({
+    movie: makeEmptyGenreState(),
+    tv: makeEmptyGenreState(),
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [trendingMediaType, setTrendingMediaType] = useState<"movie" | "tv">("movie");
@@ -182,7 +197,15 @@ export default function MovieRecommendationsUI() {
     finally {
       favoritesReadyRef.current = true;
     }
+
   }, []);
+  const handleFeedMediaTypeChange = useCallback((type: "movie" | "tv") => {
+    setFeedMediaType(type);
+    if (activeFeed === "trending") {
+      setTrendingMediaType(type);
+    }
+  }, [activeFeed]);
+
   useEffect(() => {
     if (!favoritesReadyRef.current) {
       return;
@@ -229,24 +252,70 @@ export default function MovieRecommendationsUI() {
     });
   }, [catalog]);
   useEffect(() => {
-    fetchJSON("/api/tmdb?fn=genre_list").then((data: {
-      genres?: Array<{
-        id: number;
-        name: string;
-      }>;
-    }) => {
+    let cancelled = false;
+
+    const toGenreState = (payload: { genres?: Array<{ id: number; name: string }>; }): GenreState => {
       const dict: Record<number, string> = {};
       const nameToId: Record<string, number> = {};
       const names: string[] = [];
-      (data?.genres || []).forEach((genre) => { dict[genre.id] = genre.name; nameToId[genre.name] = genre.id; names.push(genre.name); });
-      if (names.length) {
-        setGenreChoices(names);
-        setGenresDict(dict);
-        setGenreNameToId(nameToId);
+      (payload?.genres || []).forEach((genre) => {
+        dict[genre.id] = genre.name;
+        nameToId[genre.name] = genre.id;
+        names.push(genre.name);
+      });
+      return names.length ? { dict, nameToId, names } : makeEmptyGenreState();
+    };
+
+    async function load() {
+      try {
+        const [moviesResult, tvResult] = await Promise.allSettled([
+          fetchJSON("/api/tmdb?fn=genre_list&mediaType=movie"),
+          fetchJSON("/api/tmdb?fn=genre_list&mediaType=tv"),
+        ]);
+        if (cancelled) {
+          return;
+        }
+        setGenreCache((prev) => {
+          const next = { ...prev };
+          if (moviesResult.status === "fulfilled") {
+            next.movie = toGenreState(moviesResult.value as { genres?: Array<{ id: number; name: string }> });
+          }
+          if (tvResult.status === "fulfilled") {
+            next.tv = toGenreState(tvResult.value as { genres?: Array<{ id: number; name: string }> });
+          }
+          return next;
+        });
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("Failed to load TMDb genres", error)
+        }
       }
-    }).catch(() => { setGenresDict({}); });
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
+  useEffect(() => {
+    const current = genreCache[feedMediaType];
+    if (current.names.length) {
+      setGenreChoices([...current.names]);
+      setGenresDict({ ...current.dict });
+      setGenreNameToId({ ...current.nameToId });
+    } else {
+      setGenreChoices(FALLBACK_GENRES);
+      setGenresDict({});
+      setGenreNameToId({});
+    }
+    setActiveGenres((prev) => prev.filter((genre) => Boolean(genreCache[feedMediaType].nameToId[genre])));
+  }, [feedMediaType, genreCache]);
   useEffect(() => { fetchJSON("/api/tmdb?fn=configuration").then((data: TmdbConfiguration) => { setConfiguration(data); }).catch((err: Error) => { setConfigurationError(err.message); }); }, []);
+  useEffect(() => {
+    if (activeFeed !== "trending") {
+      setTrendingMediaType(feedMediaType);
+    }
+  }, [activeFeed, feedMediaType]);
   useEffect(() => {
     if (activeFeed === "watchlist") {
       setLoading(false);
@@ -264,27 +333,25 @@ export default function MovieRecommendationsUI() {
       setLoading(true);
       setError(null);
       try {
-        let url = "/api/tmdb?fn=popular";
+        let url = `/api/tmdb?fn=popular&mediaType=${feedMediaType}`;
         const params = new URLSearchParams();
-        let fallbackMediaType: "movie" | "tv" = "movie";
+        let fallbackMediaType: "movie" | "tv" = feedMediaType;
         switch (activeFeed) {
           case "popular":
-            url = "/api/tmdb?fn=popular";
+            url = `/api/tmdb?fn=popular&mediaType=${feedMediaType}`;
             break;
           case "now_playing":
-            url = "/api/tmdb?fn=now_playing";
+            url = `/api/tmdb?fn=now_playing&mediaType=${feedMediaType}`;
             break;
           case "upcoming":
-            url = "/api/tmdb?fn=upcoming";
-            break;
-          case "tv_popular":
-            url = "/api/tmdb?fn=tv_popular";
-            fallbackMediaType = "tv";
+            url = `/api/tmdb?fn=upcoming&mediaType=${feedMediaType}`;
             break;
           case "discover":
-            url = "/api/tmdb?fn=discover";
+            url = `/api/tmdb?fn=discover&mediaType=${feedMediaType}`;
             if (activeGenres.length) {
-              const ids = activeGenres.map((name) => genreNameToId[name]).filter((value): value is number => typeof value === "number");
+              const ids = activeGenres
+                .map((name) => genreNameToId[name])
+                .filter((value): value is number => typeof value === "number");
               if (ids.length) {
                 params.set("with_genres", ids.join(","));
               }
@@ -295,33 +362,61 @@ export default function MovieRecommendationsUI() {
             fallbackMediaType = trendingMediaType;
             break;
           case "search":
-            url = `/api/tmdb?fn=search&q=${encodeURIComponent(query.trim())}`;
+            url = `/api/tmdb?fn=search&q=${encodeURIComponent(query.trim())}&mediaType=${feedMediaType}`;
             break;
           default:
-            url = "/api/tmdb?fn=popular";
+            url = `/api/tmdb?fn=popular&mediaType=${feedMediaType}`;
             break;
         }
-        const finalUrl = params.toString() ? `${url}${url.includes("?") ? "&" : "?"}${params.toString()}` : url;
+        const finalUrl = params.toString()
+          ? `${url}${url.includes("?") ? "&" : "?"}${params.toString()}`
+          : url;
         const json = await fetchJSON(finalUrl, { signal: controller.signal });
-        const results: TmdbMovie[] = Array.isArray(json?.results) ? json.results : Array.isArray(json?.items) ? json.items : [];
-        const mapped: UiMovie[] = results.map((item) => { const mediaType = item.media_type === "tv" || fallbackMediaType === "tv" ? "tv" : "movie"; const releaseDate = mediaType === "tv" ? item.first_air_date : item.release_date; return { id: String(item.id), title: item.title || item.name || "Untitled", year: formatYear(releaseDate), genres: (item.genre_ids || []).map((gid) => genresDict[gid]).filter((value): value is string => Boolean(value)), rating: Number((item.vote_average ?? 0).toFixed(1)), poster: item.poster_path ? `${TMDB_IMG_URL}${item.poster_path}` : FALLBACK_POSTER, overview: item.overview || "", mediaType, }; });
+        const results: TmdbMovie[] = Array.isArray(json?.results)
+          ? json.results
+          : Array.isArray(json?.items)
+          ? json.items
+          : [];
+        const mapped: UiMovie[] = results.map((item) => {
+          const resolvedMediaType =
+            item.media_type === "tv" || fallbackMediaType === "tv" ? "tv" : "movie";
+          const releaseDate = resolvedMediaType === "tv" ? item.first_air_date : item.release_date;
+          const genreDict =
+            resolvedMediaType === "tv" ? genreCache.tv.dict : genreCache.movie.dict;
+          return {
+            id: String(item.id),
+            title: item.title || item.name || "Untitled",
+            year: formatYear(releaseDate),
+            genres: (item.genre_ids || [])
+              .map((gid) => genreDict[gid])
+              .filter((value): value is string => Boolean(value)),
+            rating: Number((item.vote_average ?? 0).toFixed(1)),
+            poster: item.poster_path ? `${TMDB_IMG_URL}${item.poster_path}` : FALLBACK_POSTER,
+            overview: item.overview || "",
+            mediaType: resolvedMediaType,
+          };
+        });
         setMovies(mapped);
-        setCatalog((prev) => { const next = { ...prev }; mapped.forEach((entry) => { next[entry.id] = entry; }); return next; });
-      }
-      catch (err: unknown) {
+        setCatalog((prev) => {
+          const next = { ...prev };
+          mapped.forEach((entry) => {
+            next[entry.id] = entry;
+          });
+          return next;
+        });
+      } catch (err: unknown) {
         if (err instanceof DOMException && err.name === "AbortError") {
           return;
         }
         const message = err instanceof Error ? err.message : "Unable to load titles from TMDb";
         setError(message);
-      }
-      finally {
+      } finally {
         setLoading(false);
       }
     }
     load();
     return () => controller.abort();
-  }, [activeFeed, query, trendingMediaType, trendingWindow, genresDict, activeGenres, genreNameToId,]);
+  }, [activeFeed, activeGenres, feedMediaType, genreCache, genreNameToId, query, trendingMediaType, trendingWindow]);
   useEffect(() => {
     if (!selected) {
       setDetails(null);
@@ -414,7 +509,7 @@ export default function MovieRecommendationsUI() {
   }, [activeFeed, query]);
   const posterPreviewBase = configuration?.images?.secure_base_url || TMDB_IMG_URL.replace("/w500", "/");
   const preferredPosterSize = configuration?.images?.poster_sizes?.find((size) => size === "w342") || configuration?.images?.poster_sizes?.[0] || "w500";
-  return (<div>      <HeaderWrap>        <Container>          <Brand>            <AppBadge>              <Film size={20} />            </AppBadge>            <div>              <div style={{ fontWeight: 700 }}>SceneScout</div>              <Muted>Powered by TMDb</Muted>            </div>          </Brand>        </Container>        <Container style={{ paddingTop: 0 }}>          <InputWrap>            <LeftIcon>              <Search size={16} />            </LeftIcon>            <Input value={query} onChange={(event) => handleQueryChange(event.target.value)} placeholder="Search movies or TV shows" />            <RightShortcuts>              <Kbd>Ctrl</Kbd>              <Kbd>K</Kbd>            </RightShortcuts>          </InputWrap>          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>            <Button variant="outline">              <SlidersHorizontal size={16} /> Filters            </Button>            <Button onClick={() => handleQueryChange("")}>              <Sparkles size={16} /> Surprise me            </Button>          </div>        </Container>        <Container style={{ paddingTop: 8 }}>          <Tabs>            {tabsToRender.map((feed) => {
+  return (<div>      <HeaderWrap>        <Container>          <Brand>            <AppBadge>              <Film size={20} />            </AppBadge>            <div>              <div style={{ fontWeight: 700 }}>SceneScout</div>              <Muted>Powered by TMDb</Muted>            </div>          </Brand>          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>            <Button size="sm" variant={feedMediaType === "movie" ? "solid" : "outline"} onClick={() => handleFeedMediaTypeChange("movie")}>              Movies            </Button>            <Button size="sm" variant={feedMediaType === "tv" ? "solid" : "outline"} onClick={() => handleFeedMediaTypeChange("tv")}>              TV            </Button>          </div>        </Container>        <Container style={{ paddingTop: 0 }}>          <InputWrap>            <LeftIcon>              <Search size={16} />            </LeftIcon>            <Input value={query} onChange={(event) => handleQueryChange(event.target.value)} placeholder="Search movies or TV shows" />            <RightShortcuts>              <Kbd>Ctrl</Kbd>              <Kbd>K</Kbd>            </RightShortcuts>          </InputWrap>          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>            <Button variant="outline">              <SlidersHorizontal size={16} /> Filters            </Button>            <Button onClick={() => handleQueryChange("")}>              <Sparkles size={16} /> Surprise me            </Button>          </div>        </Container>        <Container style={{ paddingTop: 8 }}>          <Tabs>            {tabsToRender.map((feed) => {
     const Icon = feed.icon;
     const isActive = activeFeed === feed.id;
     const disabled = feed.id === "search" && !query.trim();
@@ -423,7 +518,7 @@ export default function MovieRecommendationsUI() {
         return;
       setActiveFeed(feed.id as FeedId);
     }} disabled={disabled as boolean | undefined}>                  {Icon ? <Icon size={16} /> : null}                  {feed.label}                </TabBtn>);
-  })}          </Tabs>        </Container>      </HeaderWrap>      <Main>        <div style={{ position: "sticky", top: 100, display: "grid", gap: 16, height: "fit-content" }}>          <Card>            <CardHeader>              <CardTitle>Refine</CardTitle>              <CardDescription>Tune the recommendation feed.</CardDescription>            </CardHeader>            <CardBody style={{ display: "grid", gap: 24 }}>              <div>                <SliderRow>                  <div style={{ fontSize: 14, fontWeight: 600 }}>Minimum rating</div>                  <div style={{ fontSize: 12, color: theme.colors.subtext }}>{minRating.toFixed(1)}</div>                </SliderRow>                <Range value={minRating} onChange={(event) => setMinRating(parseFloat(event.target.value))} />              </div>              <div>                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Genres</div>                <GenrePills>                  {genreChoices.map((genre) => (<Pill key={genre} active={activeGenres.includes(genre)} onClick={() => toggleGenre(genre)}>                      {genre}                      {activeGenres.includes(genre) && <X size={14} />}                    </Pill>))}                </GenrePills>              </div>              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>                <Button variant="ghost" size="sm" onClick={() => setMinRating(7)}>                  Reset                </Button>                <Kbd>{activeGenres.length || "Any"} genres</Kbd>              </div>            </CardBody>          </Card>          <Card>            <CardHeader>              <CardTitle>TMDb Configuration</CardTitle>              <CardDescription>Image base URLs and poster sizes</CardDescription>            </CardHeader>            <CardBody style={{ display: "grid", gap: 8, fontSize: 12 }}>              {configuration ? (<>                  <div>                    <strong>Secure base URL:</strong>                    <div>{configuration.images?.secure_base_url || "Unavailable"}</div>                  </div>                  <div>                    <strong>Poster sizes:</strong>                    <div>{(configuration.images?.poster_sizes || []).join(", ") || "Unavailable"}</div>                  </div>                  <div>                    <strong>Backdrop sizes:</strong>                    <div>{(configuration.images?.backdrop_sizes || []).join(", ") || "Unavailable"}</div>                  </div>                </>) : configurationError ? (<Muted>Configuration unavailable: {configurationError}</Muted>) : (<Muted>Loading configuration...</Muted>)}            </CardBody>          </Card>        </div>        <section style={{ display: "grid", gap: 16 }}>          {activeFeed === "trending" && (<Card>              <CardBody style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>                <div style={{ fontWeight: 600 }}>Trending filters</div>                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>                  <label style={{ fontSize: 12, color: theme.colors.subtext }}>Type</label>                  <select value={trendingMediaType} onChange={(event) => setTrendingMediaType(event.target.value as "movie" | "tv")} style={{ border: `1px solid ${theme.colors.border}`, borderRadius: 8, padding: "6px 10px", background: "#fff", }}>                    {TRENDING_MEDIA_TYPES.map((option) => (<option key={option.id} value={option.id}>                        {option.label}                      </option>))}                  </select>                </div>                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>                  <label style={{ fontSize: 12, color: theme.colors.subtext }}>Window</label>                  <select value={trendingWindow} onChange={(event) => setTrendingWindow(event.target.value as "day" | "week")} style={{ border: `1px solid ${theme.colors.border}`, borderRadius: 8, padding: "6px 10px", background: "#fff", }}>                    {TRENDING_WINDOWS.map((option) => (<option key={option.id} value={option.id}>                        {option.label}                      </option>))}                  </select>                </div>              </CardBody>            </Card>)}          {error && <Danger>TMDb error: {error}</Danger>}          <AnimatePresence mode="popLayout">            {loading ? (<Grid>                {Array.from({ length: 8 }).map((_, index) => (<motion.div key={index} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} style={{ height: 280, borderRadius: 12, background: theme.colors.muted, border: `1px solid ${theme.colors.border}`, }} />))}              </Grid>) : filtered.length === 0 ? (<EmptyState onClear={() => { setActiveGenres([]); setMinRating(7); }} />) : (<Grid>                {filtered.map((movie, index) => (<motion.div key={movie.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ delay: index * 0.02 }}>                    <MovieCard movie={movie} liked={Boolean(likes[movie.id])} watchlisted={watchlist.includes(movie.id)} onLike={() => toggleLike(movie.id)} onWatchlist={() => toggleWatchlist(movie.id)} onInfo={() => setSelected({ id: movie.id, mediaType: movie.mediaType })} />                  </motion.div>))}              </Grid>)}          </AnimatePresence>          <DetailsPanel movie={selectedMovie} details={details} loading={detailsLoading} error={detailsError} onClose={() => setSelected(null)} posterBase={`${posterPreviewBase}${preferredPosterSize}`} />        </section>      </Main>    </div>);
+  })}          </Tabs>        </Container>      </HeaderWrap>      <Main>        <div style={{ position: "sticky", top: 100, display: "grid", gap: 16, height: "fit-content" }}>          <Card>            <CardHeader>              <CardTitle>Refine</CardTitle>              <CardDescription>Tune the recommendation feed.</CardDescription>            </CardHeader>            <CardBody style={{ display: "grid", gap: 24 }}>              <div>                <SliderRow>                  <div style={{ fontSize: 14, fontWeight: 600 }}>Minimum rating</div>                  <div style={{ fontSize: 12, color: theme.colors.subtext }}>{minRating.toFixed(1)}</div>                </SliderRow>                <Range value={minRating} onChange={(event) => setMinRating(parseFloat(event.target.value))} />              </div>              <div>                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Genres</div>                <GenrePills>                  {genreChoices.map((genre) => (<Pill key={genre} active={activeGenres.includes(genre)} onClick={() => toggleGenre(genre)}>                      {genre}                      {activeGenres.includes(genre) && <X size={14} />}                    </Pill>))}                </GenrePills>              </div>              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>                <Button variant="ghost" size="sm" onClick={() => setMinRating(7)}>                  Reset                </Button>                <Kbd>{activeGenres.length || "Any"} genres</Kbd>              </div>            </CardBody>          </Card>          <Card>            <CardHeader>              <CardTitle>TMDb Configuration</CardTitle>              <CardDescription>Image base URLs and poster sizes</CardDescription>            </CardHeader>            <CardBody style={{ display: "grid", gap: 8, fontSize: 12 }}>              {configuration ? (<>                  <div>                    <strong>Secure base URL:</strong>                    <div>{configuration.images?.secure_base_url || "Unavailable"}</div>                  </div>                  <div>                    <strong>Poster sizes:</strong>                    <div>{(configuration.images?.poster_sizes || []).join(", ") || "Unavailable"}</div>                  </div>                  <div>                    <strong>Backdrop sizes:</strong>                    <div>{(configuration.images?.backdrop_sizes || []).join(", ") || "Unavailable"}</div>                  </div>                </>) : configurationError ? (<Muted>Configuration unavailable: {configurationError}</Muted>) : (<Muted>Loading configuration...</Muted>)}            </CardBody>          </Card>        </div>        <section style={{ display: "grid", gap: 16 }}>          {activeFeed === "trending" && (<Card>              <CardBody style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>                <div style={{ fontWeight: 600 }}>Trending filters</div>                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>                  <label style={{ fontSize: 12, color: theme.colors.subtext }}>Type</label>                  <select value={trendingMediaType} onChange={(event) => handleFeedMediaTypeChange(event.target.value as "movie" | "tv")} style={{ border: `1px solid ${theme.colors.border}`, borderRadius: 8, padding: "6px 10px", background: "#fff", }}>                    {TRENDING_MEDIA_TYPES.map((option) => (<option key={option.id} value={option.id}>                        {option.label}                      </option>))}                  </select>                </div>                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>                  <label style={{ fontSize: 12, color: theme.colors.subtext }}>Window</label>                  <select value={trendingWindow} onChange={(event) => setTrendingWindow(event.target.value as "day" | "week")} style={{ border: `1px solid ${theme.colors.border}`, borderRadius: 8, padding: "6px 10px", background: "#fff", }}>                    {TRENDING_WINDOWS.map((option) => (<option key={option.id} value={option.id}>                        {option.label}                      </option>))}                  </select>                </div>              </CardBody>            </Card>)}          {error && <Danger>TMDb error: {error}</Danger>}          <AnimatePresence mode="popLayout">            {loading ? (<Grid>                {Array.from({ length: 8 }).map((_, index) => (<motion.div key={index} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} style={{ height: 280, borderRadius: 12, background: theme.colors.muted, border: `1px solid ${theme.colors.border}`, }} />))}              </Grid>) : filtered.length === 0 ? (<EmptyState onClear={() => { setActiveGenres([]); setMinRating(7); }} />) : (<Grid>                {filtered.map((movie, index) => (<motion.div key={movie.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ delay: index * 0.02 }}>                    <MovieCard movie={movie} liked={Boolean(likes[movie.id])} watchlisted={watchlist.includes(movie.id)} onLike={() => toggleLike(movie.id)} onWatchlist={() => toggleWatchlist(movie.id)} onInfo={() => setSelected({ id: movie.id, mediaType: movie.mediaType })} />                  </motion.div>))}              </Grid>)}          </AnimatePresence>          <DetailsPanel movie={selectedMovie} details={details} loading={detailsLoading} error={detailsError} onClose={() => setSelected(null)} posterBase={`${posterPreviewBase}${preferredPosterSize}`} />        </section>      </Main>    </div>);
 }
 type DetailsPanelProps = {
   movie: UiMovie | null;

@@ -71,6 +71,12 @@ function finalizeUrl(
   return url;
 }
 
+
+function resolveMediaType(req: NextApiRequest, defaultType: "movie" | "tv" = "movie"): "movie" | "tv" {
+  const raw = toSingleValue(req.query.mediaType);
+  return raw === "tv" ? "tv" : defaultType;
+}
+
 function buildTmdbUrl(
   fn: string,
   req: NextApiRequest,
@@ -79,29 +85,39 @@ function buildTmdbUrl(
 ): string {
   switch (fn) {
     case "popular": {
-      const url = createUrl(base, "movie/popular");
-      finalizeUrl(url, req, [], apiKey);
+      const mediaType = resolveMediaType(req);
+      const path = mediaType === "tv" ? "tv/popular" : "movie/popular";
+      const url = createUrl(base, path);
+      finalizeUrl(url, req, ["mediaType"], apiKey);
       return url.toString();
     }
     case "now_playing": {
-      const url = createUrl(base, "movie/now_playing");
-      finalizeUrl(url, req, [], apiKey);
+      const mediaType = resolveMediaType(req);
+      const path = mediaType === "tv" ? "tv/on_the_air" : "movie/now_playing";
+      const url = createUrl(base, path);
+      finalizeUrl(url, req, ["mediaType"], apiKey);
       return url.toString();
     }
     case "upcoming": {
-      const url = createUrl(base, "movie/upcoming");
-      finalizeUrl(url, req, [], apiKey);
+      const mediaType = resolveMediaType(req);
+      const path = mediaType === "tv" ? "tv/airing_today" : "movie/upcoming";
+      const url = createUrl(base, path);
+      finalizeUrl(url, req, ["mediaType"], apiKey);
       return url.toString();
     }
     case "discover":
     case "discover_movie": {
-      const url = createUrl(base, "discover/movie");
-      finalizeUrl(url, req, [], apiKey);
+      const mediaType = resolveMediaType(req);
+      const path = mediaType === "tv" ? "discover/tv" : "discover/movie";
+      const url = createUrl(base, path);
+      finalizeUrl(url, req, ["mediaType"], apiKey);
       return url.toString();
     }
     case "genre_list": {
-      const url = createUrl(base, "genre/movie/list");
-      finalizeUrl(url, req, [], apiKey);
+      const mediaType = resolveMediaType(req);
+      const path = mediaType === "tv" ? "genre/tv/list" : "genre/movie/list";
+      const url = createUrl(base, path);
+      finalizeUrl(url, req, ["mediaType"], apiKey);
       return url.toString();
     }
     case "search": {
@@ -109,9 +125,11 @@ function buildTmdbUrl(
       if (!q) {
         throw new HttpError(400, "Missing search query");
       }
-      const url = createUrl(base, "search/movie");
+      const mediaType = resolveMediaType(req);
+      const path = mediaType === "tv" ? "search/tv" : "search/movie";
+      const url = createUrl(base, path);
       url.searchParams.set("query", q);
-      finalizeUrl(url, req, [], apiKey);
+      finalizeUrl(url, req, ["mediaType"], apiKey);
       return url.toString();
     }
     case "trending": {
