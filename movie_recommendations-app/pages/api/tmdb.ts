@@ -1,3 +1,4 @@
+import axios from "axios";
 import type { NextApiRequest, NextApiResponse } from "next";
 
 class HttpError extends Error {
@@ -245,13 +246,8 @@ function buildTmdbUrl(
 function resolveCredentials(): { bearerToken?: string; apiKey?: string } {
   const rawReadAccess =
     process.env.NEXT_PUBLIC_TMDB_READACCESS_API_KEY || "";
-  const rawApiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY || "";
 
   const result: { bearerToken?: string; apiKey?: string } = {};
-
-  if (rawApiKey) {
-    result.apiKey = rawApiKey;
-  }
 
   if (rawReadAccess) {
     const looksLikeApiKey = /^[A-Za-z0-9]{32}$/.test(rawReadAccess);
@@ -267,7 +263,7 @@ function resolveCredentials(): { bearerToken?: string; apiKey?: string } {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const fn = (req.query.fn as string) || "popular";
-  const base = process.env.NEXT_PUBLIC_TMDB_API_BASE_URL || "https://api.themoviedb.org/3";
+  const base = process.env.NEXT_PUBLIC_TMDB_API_BASE_URL || "http://api.themoviedb.org/3";
   const { bearerToken, apiKey } = resolveCredentials();
 
   if (!bearerToken && !apiKey) {
@@ -275,37 +271,67 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return;
   }
 
+  const requestHeaders: Record<string, string> = {
+    accept: "application/json",
+    ...(bearerToken ? { Authorization: `Bearer ${bearerToken}` } : {}),
+  };
+  const shouldLogRequest =
+    process.env.NEXT_PUBLIC_TMDB_LOG_REQUESTS === "true" ||
+    process.env.TMDB_LOG_REQUESTS === "true";
+
+  let targetUrl: string | null = null;
+
   try {
-    const url = buildTmdbUrl(fn, req, base, apiKey);
-    const requestHeaders: Record<string, string> = {
-      accept: "application/json",
-      ...(bearerToken ? { Authorization: `Bearer ${bearerToken}` } : {}),
-    };
-    const shouldLogRequest =
-      process.env.NEXT_PUBLIC_TMDB_LOG_REQUESTS === "true" ||
-      process.env.TMDB_LOG_REQUESTS === "true";
+    targetUrl = buildTmdbUrl(fn, req, base, apiKey);
     if (shouldLogRequest) {
       const safeHeaders = { ...requestHeaders };
       if (safeHeaders.Authorization) {
         safeHeaders.Authorization = "Bearer ***";
       }
-      console.log("[tmdb] outbound request", { fn, url: maskApiKey(url), headers: safeHeaders });
+      console.log("[tmdb] outbound request", { fn, url: maskApiKey(targetUrl), headers: safeHeaders });
     }
-    const response = await fetch(url, {
+
+    const response = await axios.get(targetUrl, {
       headers: requestHeaders,
+      validateStatus: () => true,
     });
 
-    const payload = await response.json();
+    const { status, data } = response;
 
-    if (!response.ok) {
-      res.status(response.status).json({ error: payload });
+    if (shouldLogRequest) {
+      let responsePreview: unknown = data;
+      if (typeof responsePreview === "object" && responsePreview !== null) {
+        try {
+          const serialized = JSON.stringify(responsePreview);
+          responsePreview = serialized.length > 1000 ? `${serialized.slice(0, 1000)}...` : serialized;
+        } catch {
+          responsePreview = "[unserializable payload]";
+        }
+      }
+      console.log("[tmdb] response", { fn, status, url: maskApiKey(targetUrl), preview: responsePreview });
+    }
+
+    if (status < 200 || status >= 300) {
+      res.status(status).json({ error: data });
       return;
     }
 
-    res.status(response.status).json(payload);
+    res.status(status).json(data);
   } catch (error: unknown) {
     if (error instanceof HttpError) {
       res.status(error.status).json({ error: error.message });
+      return;
+    }
+
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status ?? 500;
+      const data = error.response?.data ?? error.message;
+      const rawUrl = error.config?.url ?? targetUrl;
+      if (shouldLogRequest) {
+        const safeUrl = rawUrl ? maskApiKey(rawUrl) : "unknown";
+        console.error("[tmdb] axios error", { fn, url: safeUrl, status, message: error.message });
+      }
+      res.status(status).json({ error: data });
       return;
     }
 
