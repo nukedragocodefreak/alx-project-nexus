@@ -6,4 +6,5 @@ export interface MovieCardProps {
   watchlisted: boolean;
   onLike: () => void;
   onWatchlist: () => void;
+  onInfo?: () => void;
 }

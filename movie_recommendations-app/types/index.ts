@@ -8,6 +8,7 @@ export type TmdbMovie = {
   vote_average?: number;
   overview?: string;
   poster_path?: string | null;
+  media_type?: "movie" | "tv" | string;
 };
 
 export type UiMovie = {
@@ -20,4 +21,5 @@ export type UiMovie = {
   poster: string;
   overview: string;
   trending?: boolean;
+  mediaType: "movie" | "tv";
 };

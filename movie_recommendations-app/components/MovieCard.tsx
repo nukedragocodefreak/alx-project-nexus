@@ -3,6 +3,7 @@ import { Star, Heart, Plus, Info } from "lucide-react";
 import theme, { Components } from "@/components/theme";
 import { truncate } from "@/Utils/index";
 import { MovieCardProps } from "@/interfaces";
+
 const { Card, CardBody, PosterWrap, Poster, Overlay, YearBadge, Tiny, Button } = Components;
 
 const MovieCard: React.FC<MovieCardProps> = ({
@@ -11,7 +12,12 @@ const MovieCard: React.FC<MovieCardProps> = ({
   watchlisted,
   onLike,
   onWatchlist,
+  onInfo,
 }) => {
+  const meta = [movie.mediaType === "tv" ? "TV" : "Movie", movie.genres.slice(0, 3).join(", ")]
+    .filter(Boolean)
+    .join(" | ");
+
   return (
     <Card>
       <PosterWrap>
@@ -21,7 +27,7 @@ const MovieCard: React.FC<MovieCardProps> = ({
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <YearBadge>{movie.year}</YearBadge>
               <Tiny>
-                <Star size={14} fill="currentColor" /> {movie.rating}
+                <Star size={14} fill="currentColor" /> {movie.rating.toFixed(1)}
               </Tiny>
             </div>
             <div
@@ -32,7 +38,7 @@ const MovieCard: React.FC<MovieCardProps> = ({
             >
               {movie.title}
             </div>
-            <Tiny style={{ opacity: 0.9 }}>{movie.genres.join(" • ")}</Tiny>
+            {meta ? <Tiny style={{ opacity: 0.9 }}>{meta}</Tiny> : null}
           </div>
 
           <div style={{ display: "flex", gap: 6 }}>
@@ -41,6 +47,7 @@ const MovieCard: React.FC<MovieCardProps> = ({
               variant="outline"
               onClick={onLike}
               style={{ background: liked ? "#ffe4ef" : undefined }}
+              aria-label={liked ? "Unlike" : "Like"}
             >
               <Heart size={16} {...(liked ? { fill: "currentColor" } : {})} />
             </Button>
@@ -49,10 +56,17 @@ const MovieCard: React.FC<MovieCardProps> = ({
               variant="outline"
               onClick={onWatchlist}
               style={{ background: watchlisted ? "#ffedd5" : undefined }}
+              aria-label={watchlisted ? "Remove from watchlist" : "Add to watchlist"}
             >
               <Plus size={16} />
             </Button>
-            <Button size="icon" variant="outline" aria-label="Info">
+            <Button
+              size="icon"
+              variant="outline"
+              onClick={onInfo}
+              disabled={!onInfo}
+              aria-label="More details"
+            >
               <Info size={16} />
             </Button>
           </div>
