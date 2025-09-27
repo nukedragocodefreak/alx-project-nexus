@@ -1,52 +1,315 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  try {
-    const fn = (req.query.fn as string) || "popular";
-    const q = (req.query.q as string) || "";
-    const key = process.env.TMDB_API_KEY;
-    const base = "https://api.themoviedb.org/3";
+class HttpError extends Error {
+  status: number;
 
-        if (!key) {
-        res.status(500).json({ error: "Missing TMDB_API_KEY" });
-        return;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+const RESERVED_QUERY_KEYS = new Set([
+  "fn",
+  "q",
+  "movieId",
+  "tvId",
+  "mediaType",
+  "timeWindow",
+]);
+
+function toSingleValue(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+  return value;
+}
+
+function requireParam(req: NextApiRequest, key: string, message: string): string {
+  const value = toSingleValue(req.query[key]);
+  if (!value) {
+    throw new HttpError(400, message);
+  }
+  return value;
+}
+
+function applyPassthroughParams(url: URL, req: NextApiRequest, extraReserved: string[] = []) {
+  const blocked = new Set([...Array.from(RESERVED_QUERY_KEYS), ...extraReserved]);
+
+  for (const [key, rawValue] of Object.entries(req.query)) {
+    if (blocked.has(key)) continue;
+    if (rawValue === undefined) continue;
+
+    if (Array.isArray(rawValue)) {
+      rawValue.forEach((v) => {
+        if (v !== undefined) {
+          url.searchParams.append(key, v);
         }
-
-    let url = `${base}/movie/popular?api_key=${key}`;   
-     if (fn === "search" && q) url = `${base}/search/movie?query=${encodeURIComponent(q)}&api_key=${key}`;
-     if(fn == "trending") url = `${base}/trending/movie/day?api_key=${key}`; 
-     if(fn == "top_rated") url = `${base}/movie/top_rated?api_key=${key}`;
-     if(fn == "upcoming") url = `${base}/movie/upcoming?api_key=${key}`;
-     if(fn == "now_playing") url = `${base}/movie/now_playing?api_key=${key}`;
-     if(fn == "latest") url = `${base}/movie/latest?api_key=${key}`;
-     if(fn == "popular") url = `${base}/movie/popular?api_key=${key}`;
-     if(fn == "discover") url = `${base}/discover/movie?api_key=${key}`;
-     if(fn == "genre_list") url = `${base}/genre/movie/list?api_key=${key}`;
-     if(fn == "movie_details" && q) url = `${base}/movie/${encodeURIComponent(q)}?api_key=${key}&append_to_response=videos,images,credits,reviews,recommendations`;
-     if(fn == "movie_credits" && q) url = `${base}/movie/${encodeURIComponent(q)}/credits?api_key=${key}`;
-     if(fn == "movie_reviews" && q) url = `${base}/movie/${encodeURIComponent(q)}/reviews?api_key=${key}`;
-     if(fn == "movie_recommendations" && q) url = `${base}/movie/${encodeURIComponent(q)}/recommendations?api_key=${key}`;
-     if(fn == "movie_similar" && q) url = `${base}/movie/${encodeURIComponent(q)}/similar?api_key=${key}`;
-     if(fn == "person_details" && q) url = `${base}/person/${encodeURIComponent(q)}?api_key=${key}&append_to_response=movie_credits,tv_credits,images`;
-     if(fn == "person_movie_credits" && q) url = `${base}/person/${encodeURIComponent(q)}/movie_credits?api_key=${key}`;
-     if(fn == "person_tv_credits" && q) url = `${base}/person/${encodeURIComponent(q)}/tv_credits?api_key=${key}`;
-     if(fn == "person_images" && q) url = `${base}/person/${encodeURIComponent(q)}/images?api_key=${key}`;
-     if(fn == "tv_details" && q) url = `${base}/tv/${encodeURIComponent(q)}?api_key=${key}&append_to_response=videos,images,credits,reviews,recommendations`;
-     if(fn == "tv_credits" && q) url = `${base}/tv/${encodeURIComponent(q)}/credits?api_key=${key}`;
-     if(fn == "tv_reviews" && q) url = `${base}/tv/${encodeURIComponent(q)}/reviews?api_key=${key}`;
-     if(fn == "tv_recommendations" && q) url = `${base}/tv/${encodeURIComponent(q)}/recommendations?api_key=${key}`;
-     if(fn == "tv_similar" && q) url = `${base}/tv/${encodeURIComponent(q)}/similar?api_key=${key}`;
-
-   const response = await fetch(url, {headers: { accept: 'application/json' }});
-     if (!response.ok) {
-        res.status(response.status).json({ error: `TMDB API error: ${response.statusText}` });
-        return;
-      }
-        const data = await response.text();
-        res.setHeader('Content-Type', 'application/json');
-        res.status(response.status).send(data);
-     }
-      catch (error: any) {
-        res.status(500).json({ error: "Internal server error" });
+      });
+    } else {
+      url.searchParams.set(key, rawValue);
     }
+  }
+}
+
+function createUrl(base: string, path: string): URL {
+  const trimmedBase = base.endsWith("/") ? base.slice(0, -1) : base;
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return new URL(`${trimmedBase}${normalizedPath}`);
+}
+
+function finalizeUrl(
+  url: URL,
+  req: NextApiRequest,
+  extraReserved: string[] = [],
+  apiKey?: string
+): URL {
+  applyPassthroughParams(url, req, extraReserved);
+  if (apiKey && !url.searchParams.has("api_key")) {
+    url.searchParams.set("api_key", apiKey);
+  }
+  return url;
+}
+
+
+function resolveMediaType(req: NextApiRequest, defaultType: "movie" | "tv" = "movie"): "movie" | "tv" {
+  const raw = toSingleValue(req.query.mediaType);
+  return raw === "tv" ? "tv" : defaultType;
+}
+
+function maskApiKey(urlString: string): string {
+  try {
+    const url = new URL(urlString);
+    if (url.searchParams.has("api_key")) {
+      url.searchParams.set("api_key", "***");
+    }
+    return url.toString();
+  } catch {
+    return urlString;
+  }
+}
+
+
+function buildTmdbUrl(
+  fn: string,
+  req: NextApiRequest,
+  base: string,
+  apiKey?: string
+): string {
+  switch (fn) {
+    case "popular": {
+      const mediaType = resolveMediaType(req);
+      const path = mediaType === "tv" ? "tv/popular" : "movie/popular";
+      const url = createUrl(base, path);
+      finalizeUrl(url, req, ["mediaType"], apiKey);
+      return url.toString();
+    }
+    case "now_playing": {
+      const mediaType = resolveMediaType(req);
+      const path = mediaType === "tv" ? "tv/on_the_air" : "movie/now_playing";
+      const url = createUrl(base, path);
+      finalizeUrl(url, req, ["mediaType"], apiKey);
+      return url.toString();
+    }
+    case "upcoming": {
+      const mediaType = resolveMediaType(req);
+      const path = mediaType === "tv" ? "tv/airing_today" : "movie/upcoming";
+      const url = createUrl(base, path);
+      finalizeUrl(url, req, ["mediaType"], apiKey);
+      return url.toString();
+    }
+    case "discover":
+    case "discover_movie": {
+      const mediaType = resolveMediaType(req);
+      const path = mediaType === "tv" ? "discover/tv" : "discover/movie";
+      const url = createUrl(base, path);
+      finalizeUrl(url, req, ["mediaType"], apiKey);
+      return url.toString();
+    }
+    case "genre_list": {
+      const mediaType = resolveMediaType(req);
+      const path = mediaType === "tv" ? "genre/tv/list" : "genre/movie/list";
+      const url = createUrl(base, path);
+      finalizeUrl(url, req, ["mediaType"], apiKey);
+      return url.toString();
+    }
+    case "search": {
+      const q = toSingleValue(req.query.q);
+      if (!q) {
+        throw new HttpError(400, "Missing search query");
+      }
+      const mediaType = resolveMediaType(req);
+      const path = mediaType === "tv" ? "search/tv" : "search/movie";
+      const url = createUrl(base, path);
+      url.searchParams.set("query", q);
+      finalizeUrl(url, req, ["mediaType"], apiKey);
+      return url.toString();
+    }
+    case "trending": {
+      const mediaType = toSingleValue(req.query.mediaType) || "movie";
+      const timeWindow = toSingleValue(req.query.timeWindow) || "day";
+      const url = createUrl(base, `trending/${mediaType}/${timeWindow}`);
+      finalizeUrl(url, req, ["mediaType", "timeWindow"], apiKey);
+      return url.toString();
+    }
+    case "configuration": {
+      const url = createUrl(base, "configuration");
+      finalizeUrl(url, req, [], apiKey);
+      return url.toString();
+    }
+    case "movie_details": {
+      const movieId = requireParam(
+        req,
+        "movieId",
+        "movieId is required for movie_details endpoint"
+      );
+      const url = createUrl(base, `movie/${movieId}`);
+      if (!req.query.append_to_response) {
+        url.searchParams.set(
+          "append_to_response",
+          "images,credits,release_dates,videos,recommendations"
+        );
+      }
+      finalizeUrl(url, req, [], apiKey);
+      return url.toString();
+    }
+    case "movie_credits": {
+      const movieId = requireParam(
+        req,
+        "movieId",
+        "movieId is required for movie_credits endpoint"
+      );
+      const url = createUrl(base, `movie/${movieId}/credits`);
+      finalizeUrl(url, req, [], apiKey);
+      return url.toString();
+    }
+    case "movie_images": {
+      const movieId = requireParam(
+        req,
+        "movieId",
+        "movieId is required for movie_images endpoint"
+      );
+      const url = createUrl(base, `movie/${movieId}/images`);
+      finalizeUrl(url, req, [], apiKey);
+      return url.toString();
+    }
+    case "movie_recommendations": {
+      const movieId = requireParam(
+        req,
+        "movieId",
+        "movieId is required for movie_recommendations endpoint"
+      );
+      const url = createUrl(base, `movie/${movieId}/recommendations`);
+      finalizeUrl(url, req, [], apiKey);
+      return url.toString();
+    }
+    case "movie_similar": {
+      const movieId = requireParam(
+        req,
+        "movieId",
+        "movieId is required for movie_similar endpoint"
+      );
+      const url = createUrl(base, `movie/${movieId}/similar`);
+      finalizeUrl(url, req, [], apiKey);
+      return url.toString();
+    }
+    case "tv_popular": {
+      const url = createUrl(base, "tv/popular");
+      finalizeUrl(url, req, [], apiKey);
+      return url.toString();
+    }
+    case "tv_details": {
+      const tvId = requireParam(req, "tvId", "tvId is required for tv_details endpoint");
+      const url = createUrl(base, `tv/${tvId}`);
+      if (!req.query.append_to_response) {
+        url.searchParams.set("append_to_response", "images,credits,videos,recommendations");
+      }
+      finalizeUrl(url, req, [], apiKey);
+      return url.toString();
+    }
+    case "tv_credits": {
+      const tvId = requireParam(req, "tvId", "tvId is required for tv_credits endpoint");
+      const url = createUrl(base, `tv/${tvId}/credits`);
+      finalizeUrl(url, req, [], apiKey);
+      return url.toString();
+    }
+    default: {
+      const url = createUrl(base, "movie/popular");
+      finalizeUrl(url, req, [], apiKey);
+      return url.toString();
+    }
+  }
+}
+
+function resolveCredentials(): { bearerToken?: string; apiKey?: string } {
+  const rawReadAccess =
+    process.env.NEXT_PUBLIC_TMDB_READACCESS_API_KEY || "";
+  const rawApiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY || "";
+
+  const result: { bearerToken?: string; apiKey?: string } = {};
+
+  if (rawApiKey) {
+    result.apiKey = rawApiKey;
+  }
+
+  if (rawReadAccess) {
+    const looksLikeApiKey = /^[A-Za-z0-9]{32}$/.test(rawReadAccess);
+    if (looksLikeApiKey && !result.apiKey) {
+      result.apiKey = rawReadAccess;
+    } else {
+      result.bearerToken = rawReadAccess;
+    }
+  }
+
+  return result;
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const fn = (req.query.fn as string) || "popular";
+  const base = process.env.NEXT_PUBLIC_TMDB_API_BASE_URL || "https://api.themoviedb.org/3";
+  const { bearerToken, apiKey } = resolveCredentials();
+
+  if (!bearerToken && !apiKey) {
+    res.status(500).json({ error: "Missing TMDB credentials" });
+    return;
+  }
+
+  try {
+    const url = buildTmdbUrl(fn, req, base, apiKey);
+    const requestHeaders: Record<string, string> = {
+      accept: "application/json",
+      ...(bearerToken ? { Authorization: `Bearer ${bearerToken}` } : {}),
+    };
+    const shouldLogRequest =
+      process.env.NEXT_PUBLIC_TMDB_LOG_REQUESTS === "true" ||
+      process.env.TMDB_LOG_REQUESTS === "true";
+    if (shouldLogRequest) {
+      const safeHeaders = { ...requestHeaders };
+      if (safeHeaders.Authorization) {
+        safeHeaders.Authorization = "Bearer ***";
+      }
+      console.log("[tmdb] outbound request", { fn, url: maskApiKey(url), headers: safeHeaders });
+    }
+    const response = await fetch(url, {
+      headers: requestHeaders,
+    });
+
+    const payload = await response.json();
+
+    if (!response.ok) {
+      res.status(response.status).json({ error: payload });
+      return;
+    }
+
+    res.status(response.status).json(payload);
+  } catch (error: unknown) {
+    if (error instanceof HttpError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+
+    const message = error instanceof Error ? error.message : "Internal server error";
+    res.status(500).json({ error: message });
+  }
 }
