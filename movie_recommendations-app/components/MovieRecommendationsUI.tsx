@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import theme, { Components } from "@/components/theme";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, SlidersHorizontal, Sparkles, Film, Clock, TrendingUp, Loader2, Heart, X } from "lucide-react";
-import type { TmdbMovie, UiMovie } from "@/types";
+import type { DetailsPanelProps, TmdbMovie, UiMovie, GenreState, SelectedItem, TmdbConfiguration, TmdbDetails } from "@/types";
 import { fetchJSON } from "@/Utils/index";
 import MovieCard from "@/components/MovieCard";
 import Image from "next/image";
@@ -28,65 +28,13 @@ const TRENDING_WINDOWS: Array<{
   id: "day" | "week";
   label: string;
 }> = [{ id: "day", label: "Today" }, { id: "week", label: "This Week" },];
-type GenreState = {
-  dict: Record<number, string>;
-  nameToId: Record<string, number>;
-  names: string[];
-};
 
 const makeEmptyGenreState = (): GenreState => ({
   dict: {},
   nameToId: {},
   names: [],
 });
-type SelectedItem = {
-  id: string;
-  mediaType: "movie" | "tv";
-};
-type TmdbConfiguration = {
-  images?: {
-    base_url?: string;
-    secure_base_url?: string;
-    poster_sizes?: string[];
-    backdrop_sizes?: string[];
-  };
-};
-type TmdbDetails = {
-  id: number;
-  title?: string;
-  name?: string;
-  overview?: string;
-  tagline?: string;
-  runtime?: number;
-  episode_run_time?: number[];
-  release_date?: string;
-  first_air_date?: string;
-  genres?: Array<{
-    id: number;
-    name: string;
-  }>;
-  credits?: {
-    cast?: Array<{
-      id: number;
-      name: string;
-      character?: string;
-    }>;
-    crew?: Array<{
-      id: number;
-      name: string;
-      job?: string;
-    }>;
-  };
-  images?: {
-    posters?: Array<{
-      file_path: string;
-    }>;
-    backdrops?: Array<{
-      file_path: string;
-    }>;
-  };
-  vote_average?: number;
-};
+
 function formatYear(value?: string) {
   if (!value)
     return "-";
@@ -301,11 +249,9 @@ export default function MovieRecommendationsUI() {
     const current = genreCache[feedMediaType];
     if (current.names.length) {
       setGenreChoices([...current.names]);
-      setGenresDict({ ...current.dict });
       setGenreNameToId({ ...current.nameToId });
     } else {
       setGenreChoices(FALLBACK_GENRES);
-      setGenresDict({});
       setGenreNameToId({});
     }
     setActiveGenres((prev) => prev.filter((genre) => Boolean(genreCache[feedMediaType].nameToId[genre])));
@@ -520,14 +466,7 @@ export default function MovieRecommendationsUI() {
     }} disabled={disabled as boolean | undefined}>                  {Icon ? <Icon size={16} /> : null}                  {feed.label}                </TabBtn>);
   })}          </Tabs>        </Container>      </HeaderWrap>      <Main>        <div style={{ position: "sticky", top: 100, display: "grid", gap: 16, height: "fit-content" }}>          <Card>            <CardHeader>              <CardTitle>Refine</CardTitle>              <CardDescription>Tune the recommendation feed.</CardDescription>            </CardHeader>            <CardBody style={{ display: "grid", gap: 24 }}>              <div>                <SliderRow>                  <div style={{ fontSize: 14, fontWeight: 600 }}>Minimum rating</div>                  <div style={{ fontSize: 12, color: theme.colors.subtext }}>{minRating.toFixed(1)}</div>                </SliderRow>                <Range value={minRating} onChange={(event) => setMinRating(parseFloat(event.target.value))} />              </div>              <div>                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Genres</div>                <GenrePills>                  {genreChoices.map((genre) => (<Pill key={genre} active={activeGenres.includes(genre)} onClick={() => toggleGenre(genre)}>                      {genre}                      {activeGenres.includes(genre) && <X size={14} />}                    </Pill>))}                </GenrePills>              </div>              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>                <Button variant="ghost" size="sm" onClick={() => setMinRating(7)}>                  Reset                </Button>                <Kbd>{activeGenres.length || "Any"} genres</Kbd>              </div>            </CardBody>          </Card>          <Card>            <CardHeader>              <CardTitle>TMDb Configuration</CardTitle>              <CardDescription>Image base URLs and poster sizes</CardDescription>            </CardHeader>            <CardBody style={{ display: "grid", gap: 8, fontSize: 12 }}>              {configuration ? (<>                  <div>                    <strong>Secure base URL:</strong>                    <div>{configuration.images?.secure_base_url || "Unavailable"}</div>                  </div>                  <div>                    <strong>Poster sizes:</strong>                    <div>{(configuration.images?.poster_sizes || []).join(", ") || "Unavailable"}</div>                  </div>                  <div>                    <strong>Backdrop sizes:</strong>                    <div>{(configuration.images?.backdrop_sizes || []).join(", ") || "Unavailable"}</div>                  </div>                </>) : configurationError ? (<Muted>Configuration unavailable: {configurationError}</Muted>) : (<Muted>Loading configuration...</Muted>)}            </CardBody>          </Card>        </div>        <section style={{ display: "grid", gap: 16 }}>          {activeFeed === "trending" && (<Card>              <CardBody style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>                <div style={{ fontWeight: 600 }}>Trending filters</div>                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>                  <label style={{ fontSize: 12, color: theme.colors.subtext }}>Type</label>                  <select value={trendingMediaType} onChange={(event) => handleFeedMediaTypeChange(event.target.value as "movie" | "tv")} style={{ border: `1px solid ${theme.colors.border}`, borderRadius: 8, padding: "6px 10px", background: "#fff", }}>                    {TRENDING_MEDIA_TYPES.map((option) => (<option key={option.id} value={option.id}>                        {option.label}                      </option>))}                  </select>                </div>                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>                  <label style={{ fontSize: 12, color: theme.colors.subtext }}>Window</label>                  <select value={trendingWindow} onChange={(event) => setTrendingWindow(event.target.value as "day" | "week")} style={{ border: `1px solid ${theme.colors.border}`, borderRadius: 8, padding: "6px 10px", background: "#fff", }}>                    {TRENDING_WINDOWS.map((option) => (<option key={option.id} value={option.id}>                        {option.label}                      </option>))}                  </select>                </div>              </CardBody>            </Card>)}          {error && <Danger>TMDb error: {error}</Danger>}          <AnimatePresence mode="popLayout">            {loading ? (<Grid>                {Array.from({ length: 8 }).map((_, index) => (<motion.div key={index} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} style={{ height: 280, borderRadius: 12, background: theme.colors.muted, border: `1px solid ${theme.colors.border}`, }} />))}              </Grid>) : filtered.length === 0 ? (<EmptyState onClear={() => { setActiveGenres([]); setMinRating(7); }} />) : (<Grid>                {filtered.map((movie, index) => (<motion.div key={movie.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ delay: index * 0.02 }}>                    <MovieCard movie={movie} liked={Boolean(likes[movie.id])} watchlisted={watchlist.includes(movie.id)} onLike={() => toggleLike(movie.id)} onWatchlist={() => toggleWatchlist(movie.id)} onInfo={() => setSelected({ id: movie.id, mediaType: movie.mediaType })} />                  </motion.div>))}              </Grid>)}          </AnimatePresence>          <DetailsPanel movie={selectedMovie} details={details} loading={detailsLoading} error={detailsError} onClose={() => setSelected(null)} posterBase={`${posterPreviewBase}${preferredPosterSize}`} />        </section>      </Main>    </div>);
 }
-type DetailsPanelProps = {
-  movie: UiMovie | null;
-  details: TmdbDetails | null;
-  loading: boolean;
-  error: string | null;
-  onClose: () => void;
-  posterBase: string;
-};
+
 function DetailsPanel({ movie, details, loading, error, onClose, posterBase }: DetailsPanelProps) { return (<AnimatePresence>      {movie ? (<motion.div key={movie.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} transition={{ duration: 0.2 }}>          <Card>            <CardHeader style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>              <div>                <CardTitle>{movie.title}</CardTitle>                <CardDescription>                  {movie.mediaType === "tv" ? "TV details" : "Movie details"} sourced from TMDb                </CardDescription>              </div>              <Button variant="ghost" size="icon" onClick={onClose}>                <X size={16} />              </Button>            </CardHeader>            <CardBody style={{ display: "grid", gap: 12 }}>              {loading ? (<div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14 }}>                  <Loader2 size={16} /> Loading details...                </div>) : error ? (<Danger>{error}</Danger>) : details ? (<>                  <div style={{ fontSize: 14 }}>                    <strong>Overview:</strong>                    <div style={{ marginTop: 6 }}>{details.overview || "No overview provided."}</div>                  </div>                  {details.tagline ? (<div style={{ fontStyle: "italic", color: theme.colors.subtext }}>                      &quot;{details.tagline}&quot;                    </div>) : null}                  <div style={{ display: "flex", flexWrap: "wrap", gap: 12, fontSize: 13 }}>                    <span>                      <strong>Year:</strong> {movie.year}                    </span>                    <span>                      <strong>Rating:</strong> {movie.rating.toFixed(1)}                    </span>                    {details.runtime ? (<span>                        <strong>Runtime:</strong> {details.runtime} min                      </span>) : null}                    {details.episode_run_time && details.episode_run_time.length ? (<span>                        <strong>Episode runtime:</strong> {details.episode_run_time[0]} min                      </span>) : null}                  </div>                  <div style={{ fontSize: 13 }}>                    <strong>Genres:</strong> {(details.genres || []).map((g) => g.name).join(", ") || "-"}                  </div>                  <div style={{ fontSize: 13 }}>                    <strong>Top cast:</strong>{" "}                    {(details.credits?.cast || []).slice(0, 5).map((person) => (person.character ? `${person.name} as ${person.character}` : person.name)).join(", ") || "Unavailable"}                  </div>                  {details.images?.posters && details.images.posters.length ? (<div style={{ display: "flex", gap: 12, overflowX: "auto", paddingTop: 4 }}>                      {details.images.posters.slice(0, 4).map((poster) => (<Image key={poster.file_path} src={`${posterBase}${poster.file_path}`} alt="Poster" width={120} height={180} sizes="120px" style={{ width: 120, height: "auto", borderRadius: 8, border: `1px solid ${theme.colors.border}` }} />))}                    </div>) : null}                </>) : (<Muted>Select a title to load details.</Muted>)}            </CardBody>          </Card>        </motion.div>) : null}    </AnimatePresence>); }
 type EmptyStateProps = {
   onClear: () => void;
