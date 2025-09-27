@@ -11,6 +11,11 @@ export type TmdbMovie = {
   media_type?: "movie" | "tv" | string;
 };
 
+export type TmdbListResponse = {
+  results?: TmdbMovie[];
+  items?: TmdbMovie[];
+};
+
 export type UiMovie = {
   id: string;
   title: string;

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import theme, { Components } from "@/components/theme";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, SlidersHorizontal, Sparkles, Film, Clock, TrendingUp, Loader2, Heart, X } from "lucide-react";
-import type { DetailsPanelProps, TmdbMovie, UiMovie, GenreState, SelectedItem, TmdbConfiguration, TmdbDetails } from "@/types";
+import type { DetailsPanelProps, TmdbMovie, UiMovie, GenreState, SelectedItem, TmdbConfiguration, TmdbDetails, TmdbListResponse } from "@/types";
 import { fetchJSON } from "@/Utils/index";
 import MovieCard from "@/components/MovieCard";
 import Image from "next/image";
@@ -317,7 +317,7 @@ export default function MovieRecommendationsUI() {
         const finalUrl = params.toString()
           ? `${url}${url.includes("?") ? "&" : "?"}${params.toString()}`
           : url;
-        const json = await fetchJSON(finalUrl, { signal: controller.signal });
+        const json = await fetchJSON<TmdbListResponse>(finalUrl, { signal: controller.signal });
         const results: TmdbMovie[] = Array.isArray(json?.results)
           ? json.results
           : Array.isArray(json?.items)
