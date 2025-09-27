@@ -3,6 +3,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 class HttpError extends Error {
   status: number;
 
+
   constructor(status: number, message: string) {
     super(message);
     this.status = status;
@@ -76,6 +77,19 @@ function resolveMediaType(req: NextApiRequest, defaultType: "movie" | "tv" = "mo
   const raw = toSingleValue(req.query.mediaType);
   return raw === "tv" ? "tv" : defaultType;
 }
+
+function maskApiKey(urlString: string): string {
+  try {
+    const url = new URL(urlString);
+    if (url.searchParams.has("api_key")) {
+      url.searchParams.set("api_key", "***");
+    }
+    return url.toString();
+  } catch {
+    return urlString;
+  }
+}
+
 
 function buildTmdbUrl(
   fn: string,
@@ -230,8 +244,8 @@ function buildTmdbUrl(
 
 function resolveCredentials(): { bearerToken?: string; apiKey?: string } {
   const rawReadAccess =
-    process.env.NEXT_PUBLIC_TMDB_READACCESS_API_KEY || process.env.TMDB_READACCESS_API_KEY || "";
-  const rawApiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY || process.env.TMDB_API_KEY || "";
+    process.env.NEXT_PUBLIC_TMDB_READACCESS_API_KEY || "";
+  const rawApiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY || "";
 
   const result: { bearerToken?: string; apiKey?: string } = {};
 
@@ -263,11 +277,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const url = buildTmdbUrl(fn, req, base, apiKey);
+    const requestHeaders: Record<string, string> = {
+      accept: "application/json",
+      ...(bearerToken ? { Authorization: `Bearer ${bearerToken}` } : {}),
+    };
+    const shouldLogRequest =
+      process.env.NEXT_PUBLIC_TMDB_LOG_REQUESTS === "true" ||
+      process.env.TMDB_LOG_REQUESTS === "true";
+    if (shouldLogRequest) {
+      const safeHeaders = { ...requestHeaders };
+      if (safeHeaders.Authorization) {
+        safeHeaders.Authorization = "Bearer ***";
+      }
+      console.log("[tmdb] outbound request", { fn, url: maskApiKey(url), headers: safeHeaders });
+    }
     const response = await fetch(url, {
-      headers: {
-        accept: "application/json",
-        ...(bearerToken ? { Authorization: `Bearer ${bearerToken}` } : {}),
-      },
+      headers: requestHeaders,
     });
 
     const payload = await response.json();
