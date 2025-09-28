@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import theme, { Components } from "@/components/theme";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, SlidersHorizontal, Sparkles, Film, Clock, TrendingUp, Loader2, Heart, X } from "lucide-react";
-import type { FeedId, FeedConfig, DetailsPanelProps, TmdbMovie, UiMovie, GenreState, SelectedItem, TmdbDetails, TmdbListResponse } from "@/types";
+import type {EmptyStateProps,  FeedId, FeedConfig, DetailsPanelProps, TmdbMovie, UiMovie, GenreState, SelectedItem, TmdbDetails, TmdbListResponse } from "@/types";
 import { fetchJSON } from "@/Utils/index";
 import MovieCard from "@/components/MovieCard";
 import Image from "next/image";
@@ -753,10 +753,23 @@ function DetailsPanel({ movie, details, loading, error, onClose, posterBase }: D
   );
 }
 
-type EmptyStateProps = {
-  onClear: () => void;
-};
-function EmptyState({ onClear }: EmptyStateProps) { return (<Card>      <CardBody style={{ minHeight: "30vh", display: "grid", placeItems: "center" }}>        <div style={{ maxWidth: 420, textAlign: "center", display: "grid", gap: 12 }}>          <div style={{ width: 56, height: 56, margin: "0 auto", display: "grid", placeItems: "center", border: `1px solid ${theme.colors.border}`, background: "#fff", borderRadius: 16, boxShadow: theme.shadow, }}>            <Search size={20} />          </div>          <div style={{ fontWeight: 700 }}>No matches just yet</div>          <div style={{ fontSize: 14, color: theme.colors.subtext }}>            Adjust your filters or try a different search term. You can also reset filters to start fresh.          </div>          <Button variant="outline" size="sm" onClick={onClear} style={{ width: "fit-content", margin: "0 auto" }}>            Reset filters          </Button>        </div>      </CardBody>    </Card>); }
+function EmptyState({ onClear }: EmptyStateProps) { 
+  return (<Card>      
+    <CardBody style={{ minHeight: "30vh", display: "grid", placeItems: "center" }}>       
+       <div style={{ maxWidth: 420, textAlign: "center", display: "grid", gap: 12 }}>          
+        <div style={{ width: 56, height: 56, margin: "0 auto", display: "grid", placeItems: "center", border: `1px solid ${theme.colors.border}`, background: "#fff", borderRadius: 16, boxShadow: theme.shadow, }}>            
+          <Search size={20} />          
+          </div>          
+          <div style={{ fontWeight: 700 }}>No matches just yet</div>         
+           <div style={{ fontSize: 14, color: theme.colors.subtext }}>           
+             Adjust your filters or try a different search term. You can also reset filters to start fresh.          
+             </div>          
+             <Button variant="outline" size="sm" onClick={onClear} style={{ width: "fit-content", margin: "0 auto" }}>            
+              Reset filters          
+              </Button>        
+              </div>      
+              </CardBody>   
+               </Card>); }
 
 
 
