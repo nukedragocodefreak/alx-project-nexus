@@ -602,11 +602,28 @@ export default function MovieRecommendationsUI() {
                             </CardBody>          
                             </Card>          
                                                                  </div>       
-                                                                  <section style={{ display: "grid", gap: 16 }}>          {activeFeed === "trending" && (<Card>              
+                                                                  <section style={{ display: "grid", gap: 16 }}>          {activeFeed === "trending" && (
+                                                                    <Card>              
                                                                     <CardBody style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>               
-                                                                       <div style={{ fontWeight: 600 }}>Trending filters</div>                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>                 
-                                                                         <label style={{ fontSize: 12, color: theme.colors.subtext }}>Type</label>                  <select value={trendingMediaType} onChange={(event) => handleFeedMediaTypeChange(event.target.value as "movie" | "tv")} style={{ border: `1px solid ${theme.colors.border}`, borderRadius: 8, padding: "6px 10px", background: "#fff", }}>                    {TRENDING_MEDIA_TYPES.map((option) => (<option key={option.id} value={option.id}>                        {option.label}                      </option>))}                  </select>                </div>                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>                  <label style={{ fontSize: 12, color: theme.colors.subtext }}>Window</label>                  <select value={trendingWindow} onChange={(event) => setTrendingWindow(event.target.value as "day" | "week")} style={{ border: `1px solid ${theme.colors.border}`, borderRadius: 8, padding: "6px 10px", background: "#fff", }}>                    
-                                                                          {TRENDING_WINDOWS.map((option) => (<option key={option.id} value={option.id}>                        {option.label}                      </option>))}             
+                                                                       <div style={{ fontWeight: 600 }}>Trending filters</div>                
+                                                                       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>                 
+                                                                         <label style={{ fontSize: 12, color: theme.colors.subtext }}>
+                                                                          Type
+                                                                          </label>                  
+                                                                         <select value={trendingMediaType} onChange={(event) => handleFeedMediaTypeChange(event.target.value as "movie" | "tv")} style={{ border: `1px solid ${theme.colors.border}`, borderRadius: 8, padding: "6px 10px", background: "#fff", }}>                    
+                                                                          {TRENDING_MEDIA_TYPES.map((option) => (<option key={option.id} value={option.id}>                        
+                                                                            {option.label}                      
+                                                                            </option>))}                  
+                                                                            </select>                
+                                                                            </div>                
+                                                                            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>                  
+                                                                              <label style={{ fontSize: 12, color: theme.colors.subtext }}>Window</label>                  
+                                                                              <select value={trendingWindow} onChange={(event) => setTrendingWindow(event.target.value as "day" | "week")} 
+                                                                              style={{ border: `1px solid ${theme.colors.border}`, borderRadius: 8, padding: "6px 10px", background: "#fff", }}
+                                                                              >                    
+                                                                          {TRENDING_WINDOWS.map((option) => (<option key={option.id} value={option.id}>                        
+                                                                            {option.label}                      
+                                                                            </option>))}             
                                                                                </select>              
                                                                                  </div>       
                                                                                       </CardBody>           
