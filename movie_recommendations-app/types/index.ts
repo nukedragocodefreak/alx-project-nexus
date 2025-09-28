@@ -11,6 +11,14 @@ export type TmdbMovie = {
   media_type?: "movie" | "tv" | string;
 };
 
+export type TmdbListResponse = {
+  results?: TmdbMovie[];
+  page?: number;
+  total_pages?: number;
+  total_results?: number;
+  items?: TmdbMovie[];
+};
+
 export type UiMovie = {
   id: string;
   title: string;
