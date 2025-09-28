@@ -1,12 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import theme, { Components } from "@/components/theme";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, SlidersHorizontal, Sparkles, Film, Clock, TrendingUp, Loader2, Heart, X } from "lucide-react";
-import type { DetailsPanelProps, TmdbMovie, UiMovie, GenreState, SelectedItem, TmdbConfiguration, TmdbDetails, TmdbListResponse } from "@/types";
+import type { DetailsPanelProps, TmdbMovie, UiMovie, GenreState, SelectedItem, TmdbDetails, TmdbListResponse } from "@/types";
 import { fetchJSON } from "@/Utils/index";
 import MovieCard from "@/components/MovieCard";
 import Image from "next/image";
-const { HeaderWrap, Container, Brand, AppBadge, Muted, Button, InputWrap, Input, LeftIcon, RightShortcuts, Kbd, Tabs, TabBtn, Main, Card, CardBody, CardHeader, CardTitle, CardDescription, SliderRow, Range, GenrePills, Pill, Grid, Danger, } = Components;
+const { HeaderWrap, Container, Brand, AppBadge, Muted, Button, InputWrap, Input, LeftIcon, Kbd, Tabs, TabBtn, Main, Card, CardBody, CardHeader, CardTitle, CardDescription, SliderRow, Range, GenrePills, Pill, Grid, Danger, } = Components;
 const TMDB_IMG_URL = process.env.NEXT_PUBLIC_TMDB_IMAGE_BASE_URL || "https://image.tmdb.org/t/p/w500";
 const FALLBACK_POSTER = "https://images.unsplash.com/photo-1496440737103-cd596325d314?q=80&w=1200&auto=format&fit=crop";
 const FALLBACK_GENRES = ["Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary", "Drama", "Fantasy", "History", "Horror", "Mystery", "Romance", "Sci-Fi", "Thriller",];
@@ -65,8 +65,6 @@ export default function MovieRecommendationsUI() {
   const [error, setError] = useState<string | null>(null);
   const [trendingMediaType, setTrendingMediaType] = useState<"movie" | "tv">("movie");
   const [trendingWindow, setTrendingWindow] = useState<"day" | "week">("day");
-  const [configuration, setConfiguration] = useState<TmdbConfiguration | null>(null);
-  const [configurationError, setConfigurationError] = useState<string | null>(null);
   const [selected, setSelected] = useState<SelectedItem | null>(null);
   const [details, setDetails] = useState<TmdbDetails | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
@@ -259,7 +257,6 @@ export default function MovieRecommendationsUI() {
     }
     setActiveGenres((prev) => prev.filter((genre) => Boolean(genreCache[feedMediaType].nameToId[genre])));
   }, [feedMediaType, genreCache]);
-  useEffect(() => { fetchJSON<TmdbConfiguration>("/api/tmdb?fn=configuration").then((data) => { setConfiguration(data); }).catch((err: Error) => { setConfigurationError(err.message); }); }, []);
   useEffect(() => {
     setPage(1);
   }, [activeFeed, query, feedMediaType, trendingMediaType, trendingWindow, minRating, activeGenres]);
@@ -523,9 +520,9 @@ export default function MovieRecommendationsUI() {
     }
     return FEEDS;
   }, [activeFeed, query]);
-  const posterPreviewBase = configuration?.images?.secure_base_url || TMDB_IMG_URL.replace("/w500", "/");
-  const preferredPosterSize = configuration?.images?.poster_sizes?.find((size) => size === "w342") || configuration?.images?.poster_sizes?.[0] || "w500";
-  return (<div>      <HeaderWrap>        <Container>          <Brand>            <AppBadge>              <Film size={20} />            </AppBadge>            <div>              <div style={{ fontWeight: 700 }}>SceneScout</div>              <Muted>Powered by TMDb</Muted>            </div>          </Brand>          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>            <Button size="sm" variant={feedMediaType === "movie" ? "solid" : "outline"} onClick={() => handleFeedMediaTypeChange("movie")}>              Movies            </Button>            <Button size="sm" variant={feedMediaType === "tv" ? "solid" : "outline"} onClick={() => handleFeedMediaTypeChange("tv")}>              TV            </Button>          </div>        </Container>        <Container style={{ paddingTop: 0 }}>          <InputWrap>            <LeftIcon>              <Search size={16} />            </LeftIcon>            <Input value={query} onChange={(event) => handleQueryChange(event.target.value)} placeholder="Search movies or TV shows" />            <RightShortcuts>              <Kbd>Ctrl</Kbd>              <Kbd>K</Kbd>            </RightShortcuts>          </InputWrap>          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>            <Button variant="outline">              <SlidersHorizontal size={16} /> Filters            </Button>            <Button onClick={() => handleQueryChange("")}>              <Sparkles size={16} /> Surprise me            </Button>          </div>        </Container>        <Container style={{ paddingTop: 8 }}>          <Tabs>            {tabsToRender.map((feed) => {
+  const posterPreviewBase = TMDB_IMG_URL.replace("/w500", "/");
+  const preferredPosterSize = "w500";
+  return (<div>      <HeaderWrap>        <Container>          <Brand>            <AppBadge>              <Film size={20} />            </AppBadge>            <div>              <div style={{ fontWeight: 700 }}>SceneScout</div>              <Muted>Powered by TMDb</Muted>            </div>          </Brand>          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>            <Button size="sm" variant={feedMediaType === "movie" ? "solid" : "outline"} onClick={() => handleFeedMediaTypeChange("movie")}>              Movies            </Button>            <Button size="sm" variant={feedMediaType === "tv" ? "solid" : "outline"} onClick={() => handleFeedMediaTypeChange("tv")}>              TV            </Button>          </div>        </Container>        <Container style={{ paddingTop: 0 }}>          <InputWrap>            <LeftIcon>              <Search size={16} />            </LeftIcon>            <Input value={query} onChange={(event) => handleQueryChange(event.target.value)} placeholder="Search movies or TV shows" />          </InputWrap>          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>            <Button onClick={() => handleQueryChange("")}>              <X size={16} /> Clear search            </Button>          </div>        </Container>        <Container style={{ paddingTop: 8 }}>          <Tabs>            {tabsToRender.map((feed) => {
     const Icon = feed.icon;
     const isActive = activeFeed === feed.id;
     const disabled = feed.id === "search" && !query.trim();
@@ -569,30 +566,6 @@ export default function MovieRecommendationsUI() {
                             </div>            
                             </CardBody>          
                             </Card>          
-                            <Card>            
-                              <CardHeader>              
-                                <CardTitle>TMDb Configuration</CardTitle>              
-                                <CardDescription>Image base URLs and poster sizes</CardDescription>            
-                                </CardHeader>           
-                                 <CardBody style={{ display: "grid", gap: 8, fontSize: 12 }}>              
-                                  {configuration ? (<>                  <div>                    
-                                    <strong>Secure base URL:</strong>                    
-                                    <div>{configuration.images?.secure_base_url || "Unavailable"}
-                                      </div>                
-                                      </div>                 
-                                       <div>                   
-                                         <strong>Poster sizes:</strong>                    
-                                         <div>{(configuration.images?.poster_sizes || []).join(", ") || "Unavailable"}</div>                 
-                                          </div>                  
-                                          <div>                    
-                                            <strong>Backdrop sizes:</strong> 
-                                                            <div>{(configuration.images?.backdrop_sizes || []).join(", ") || "Unavailable"}</div>                
-                                                              </div>               
-                                                               </>)
-                                                                : configurationError ? (<Muted>Configuration unavailable: {configurationError}</Muted>) : 
-                                                                (<Muted>Loading configuration...</Muted>)}            
-                                                                </CardBody>          
-                                                                </Card>       
                                                                  </div>       
                                                                   <section style={{ display: "grid", gap: 16 }}>          {activeFeed === "trending" && (<Card>              
                                                                     <CardBody style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>               
@@ -647,3 +620,7 @@ type EmptyStateProps = {
   onClear: () => void;
 };
 function EmptyState({ onClear }: EmptyStateProps) { return (<Card>      <CardBody style={{ minHeight: "30vh", display: "grid", placeItems: "center" }}>        <div style={{ maxWidth: 420, textAlign: "center", display: "grid", gap: 12 }}>          <div style={{ width: 56, height: 56, margin: "0 auto", display: "grid", placeItems: "center", border: `1px solid ${theme.colors.border}`, background: "#fff", borderRadius: 16, boxShadow: theme.shadow, }}>            <Search size={20} />          </div>          <div style={{ fontWeight: 700 }}>No matches just yet</div>          <div style={{ fontSize: 14, color: theme.colors.subtext }}>            Adjust your filters or try a different search term. You can also reset filters to start fresh.          </div>          <Button variant="outline" size="sm" onClick={onClear} style={{ width: "fit-content", margin: "0 auto" }}>            Reset filters          </Button>        </div>      </CardBody>    </Card>); }
+
+
+
+
