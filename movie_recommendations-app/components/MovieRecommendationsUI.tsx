@@ -754,7 +754,8 @@ function DetailsPanel({ movie, details, loading, error, onClose, posterBase }: D
 }
 
 function EmptyState({ onClear }: EmptyStateProps) { 
-  return (<Card>      
+  return (
+  <Card>      
     <CardBody style={{ minHeight: "30vh", display: "grid", placeItems: "center" }}>       
        <div style={{ maxWidth: 420, textAlign: "center", display: "grid", gap: 12 }}>          
         <div style={{ width: 56, height: 56, margin: "0 auto", display: "grid", placeItems: "center", border: `1px solid ${theme.colors.border}`, background: "#fff", borderRadius: 16, boxShadow: theme.shadow, }}>            
@@ -769,9 +770,6 @@ function EmptyState({ onClear }: EmptyStateProps) {
               </Button>        
               </div>      
               </CardBody>   
-               </Card>); }
-
-
-
-
-
+               </Card>
+               ); 
+              }
