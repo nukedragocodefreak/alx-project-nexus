@@ -2,24 +2,17 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import theme, { Components } from "@/components/theme";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, SlidersHorizontal, Sparkles, Film, Clock, TrendingUp, Loader2, Heart, X } from "lucide-react";
-import type { DetailsPanelProps, TmdbMovie, UiMovie, GenreState, SelectedItem, TmdbDetails, TmdbListResponse } from "@/types";
+import type { FeedId, FeedConfig, DetailsPanelProps, TmdbMovie, UiMovie, GenreState, SelectedItem, TmdbDetails, TmdbListResponse } from "@/types";
 import { fetchJSON } from "@/Utils/index";
 import MovieCard from "@/components/MovieCard";
 import Image from "next/image";
 const { HeaderWrap, Container, Brand, AppBadge, Muted, Button, InputWrap, Input, LeftIcon, Kbd, Tabs, TabBtn, Main, Card, CardBody, CardHeader, CardTitle, CardDescription, SliderRow, Range, GenrePills, Pill, Grid, Danger, } = Components;
-const TMDB_IMG_URL = process.env.NEXT_PUBLIC_TMDB_IMAGE_BASE_URL;
+const TMDB_IMG_URL = process.env.NEXT_PUBLIC_TMDB_IMAGE_BASE_URL || "";
 const FALLBACK_POSTER = "https://images.unsplash.com/photo-1496440737103-cd596325d314?q=80&w=1200&auto=format&fit=crop";
 const FALLBACK_GENRES = ["Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary", "Drama", "Fantasy", "History", "Horror", "Mystery", "Romance", "Sci-Fi", "Thriller",];
 const FAVORITES_STORAGE_KEY = "FilmFinder:favorites:v1";
 const ITEMS_PER_PAGE = 20;
-type FeedId = "popular" | "trending" | "now_playing" | "upcoming" | "discover" | "favorites" | "watchlist" | "search";
-type FeedConfig = {
-  id: FeedId;
-  label: string;
-  icon?: React.ComponentType<{
-    size?: number;
-  }>;
-};
+
 const FEEDS: FeedConfig[] = [{ id: "popular", label: "Popular", icon: Sparkles }, { id: "trending", label: "Trending", icon: TrendingUp }, { id: "now_playing", label: "Now Playing", icon: Clock }, { id: "upcoming", label: "Upcoming", icon: Film }, { id: "discover", label: "Discover", icon: SlidersHorizontal }, { id: "favorites", label: "Favorites", icon: Heart }, { id: "watchlist", label: "Watchlist", icon: Clock },];
 const TRENDING_MEDIA_TYPES: Array<{
   id: "movie" | "tv";
@@ -520,7 +513,7 @@ export default function MovieRecommendationsUI() {
     }
     return FEEDS;
   }, [activeFeed, query]);
-  const posterPreviewBase = TMDB_IMG_URL.replace("/w500", "/");
+  const posterPreviewBase = TMDB_IMG_URL ? TMDB_IMG_URL.replace("/w500", "/") : "";
   const preferredPosterSize = "w500";
   return (<div>      <HeaderWrap>        <Container>          <Brand>            <AppBadge>              <Film size={20} />            </AppBadge>            <div>              <div style={{ fontWeight: 700 }}>FilmFinder</div>              <Muted>Powered by TMDb</Muted>            </div>          </Brand>          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>            <Button size="sm" variant={feedMediaType === "movie" ? "solid" : "outline"} onClick={() => handleFeedMediaTypeChange("movie")}>              Movies            </Button>            <Button size="sm" variant={feedMediaType === "tv" ? "solid" : "outline"} onClick={() => handleFeedMediaTypeChange("tv")}>              TV Shows            </Button>          </div>        </Container>        <Container style={{ paddingTop: 0 }}>          <InputWrap>            <LeftIcon>              <Search size={16} />            </LeftIcon>            <Input value={query} onChange={(event) => handleQueryChange(event.target.value)} placeholder="Search movies or TV shows" />          </InputWrap>          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>            <Button onClick={() => handleQueryChange("")}>              <X size={16} /> Clear search            </Button>          </div>        </Container>        <Container style={{ paddingTop: 8 }}>          <Tabs>            {tabsToRender.map((feed) => {
     const Icon = feed.icon;
