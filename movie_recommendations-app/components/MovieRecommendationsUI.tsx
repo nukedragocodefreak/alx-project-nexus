@@ -622,7 +622,139 @@ export default function MovieRecommendationsUI() {
                                                                                   {Array.from({ length: 8 }).map((_, index) => (<motion.div key={index} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} style={{ height: 280, borderRadius: 12, background: theme.colors.muted, border: `1px solid ${theme.colors.border}`, }} />))}              </Grid>) : filtered.length === 0 ? (<EmptyState onClear={() => { setActiveGenres([]); setMinRating(7); }} />) : (<Grid>                {filtered.map((movie, index) => (<motion.div key={movie.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ delay: index * 0.02 }}>                    <MovieCard movie={movie} liked={Boolean(likes[movie.id])} watchlisted={watchlist.includes(movie.id)} onLike={() => toggleLike(movie.id)} onWatchlist={() => toggleWatchlist(movie.id)} onInfo={() => setSelected({ id: movie.id, mediaType: movie.mediaType })} />                  </motion.div>))}              </Grid>)}          </AnimatePresence>          <DetailsPanel movie={selectedMovie} details={details} loading={detailsLoading} error={detailsError} onClose={() => setSelected(null)} posterBase={`${posterPreviewBase}${preferredPosterSize}`} />        </section>      </Main>    </div>);
 }
 
-function DetailsPanel({ movie, details, loading, error, onClose, posterBase }: DetailsPanelProps) { return (<AnimatePresence>      {movie ? (<motion.div key={movie.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} transition={{ duration: 0.2 }}>          <Card>            <CardHeader style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>              <div>                <CardTitle>{movie.title}</CardTitle>                <CardDescription>                  {movie.mediaType === "tv" ? "TV details" : "Movie details"} sourced from TMDb                </CardDescription>              </div>              <Button variant="ghost" size="icon" onClick={onClose}>                <X size={16} />              </Button>            </CardHeader>            <CardBody style={{ display: "grid", gap: 12 }}>              {loading ? (<div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14 }}>                  <Loader2 size={16} /> Loading details...                </div>) : error ? (<Danger>{error}</Danger>) : details ? (<>                  <div style={{ fontSize: 14 }}>                    <strong>Overview:</strong>                    <div style={{ marginTop: 6 }}>{details.overview || "No overview provided."}</div>                  </div>                  {details.tagline ? (<div style={{ fontStyle: "italic", color: theme.colors.subtext }}>                      &quot;{details.tagline}&quot;                    </div>) : null}                  <div style={{ display: "flex", flexWrap: "wrap", gap: 12, fontSize: 13 }}>                    <span>                      <strong>Year:</strong> {movie.year}                    </span>                    <span>                      <strong>Rating:</strong> {movie.rating.toFixed(1)}                    </span>                    {details.runtime ? (<span>                        <strong>Runtime:</strong> {details.runtime} min                      </span>) : null}                    {details.episode_run_time && details.episode_run_time.length ? (<span>                        <strong>Episode runtime:</strong> {details.episode_run_time[0]} min                      </span>) : null}                  </div>                  <div style={{ fontSize: 13 }}>                    <strong>Genres:</strong> {(details.genres || []).map((g) => g.name).join(", ") || "-"}                  </div>                  <div style={{ fontSize: 13 }}>                    <strong>Top cast:</strong>{" "}                    {(details.credits?.cast || []).slice(0, 5).map((person) => (person.character ? `${person.name} as ${person.character}` : person.name)).join(", ") || "Unavailable"}                  </div>                  {details.images?.posters && details.images.posters.length ? (<div style={{ display: "flex", gap: 12, overflowX: "auto", paddingTop: 4 }}>                      {details.images.posters.slice(0, 4).map((poster) => (<Image key={poster.file_path} src={`${posterBase}${poster.file_path}`} alt="Poster" width={120} height={180} sizes="120px" style={{ width: 120, height: "auto", borderRadius: 8, border: `1px solid ${theme.colors.border}` }} />))}                    </div>) : null}                </>) : (<Muted>Select a title to load details.</Muted>)}            </CardBody>          </Card>        </motion.div>) : null}    </AnimatePresence>); }
+function DetailsPanel({ movie, details, loading, error, onClose, posterBase }: DetailsPanelProps) {
+  useEffect(() => {
+    if (!movie || typeof document === "undefined") {
+      return;
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+    const originalOverflow = document.body.style.overflow;
+    document.addEventListener("keydown", handleKeyDown);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [movie, onClose]);
+
+  return (
+    <AnimatePresence>
+      {movie ? (
+        <motion.div
+          key={movie.id}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.78)",
+            backdropFilter: "blur(6px)",
+            display: "grid",
+            placeItems: "center",
+            padding: 24,
+            zIndex: 2000,
+          }}
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 24, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 24, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            onClick={(event) => event.stopPropagation()}
+            style={{ width: "min(720px, 100%)", maxHeight: "90vh" }}
+          >
+            <Card style={{ display: "grid", gridTemplateRows: "auto 1fr", maxHeight: "inherit" }}>
+              <CardHeader style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                <div>
+                  <CardTitle>{movie.title}</CardTitle>
+                  <CardDescription>
+                    {movie.mediaType === "tv" ? "TV details" : "Movie details"} sourced from TMDb
+                  </CardDescription>
+                </div>
+                <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close details">
+                  <X size={16} />
+                </Button>
+              </CardHeader>
+              <CardBody style={{ display: "grid", gap: 12, overflowY: "auto", padding: 16 }}>
+                {loading ? (
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14 }}>
+                    <Loader2 size={16} /> Loading details...
+                  </div>
+                ) : error ? (
+                  <Danger>{error}</Danger>
+                ) : details ? (
+                  <>
+                    <div style={{ fontSize: 14 }}>
+                      <strong>Overview:</strong>
+                      <div style={{ marginTop: 6 }}>{details.overview || "No overview provided."}</div>
+                    </div>
+                    {details.tagline ? (
+                      <div style={{ fontStyle: "italic", color: theme.colors.subtext }}>
+                        &quot;{details.tagline}&quot;
+                      </div>
+                    ) : null}
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 12, fontSize: 13 }}>
+                      <span>
+                        <strong>Year:</strong> {movie.year}
+                      </span>
+                      <span>
+                        <strong>Rating:</strong> {movie.rating.toFixed(1)}
+                      </span>
+                      {details.runtime ? (
+                        <span>
+                          <strong>Runtime:</strong> {details.runtime} min
+                        </span>
+                      ) : null}
+                      {details.episode_run_time && details.episode_run_time.length ? (
+                        <span>
+                          <strong>Episode runtime:</strong> {details.episode_run_time[0]} min
+                        </span>
+                      ) : null}
+                    </div>
+                    <div style={{ fontSize: 13 }}>
+                      <strong>Genres:</strong> {(details.genres || []).map((g) => g.name).join(", ") || "-"}
+                    </div>
+                    <div style={{ fontSize: 13 }}>
+                      <strong>Top cast:</strong>{" "}
+                      {(details.credits?.cast || [])
+                        .slice(0, 5)
+                        .map((person) => (person.character ? `${person.name} as ${person.character}` : person.name))
+                        .join(", ") || "Unavailable"}
+                    </div>
+                    {details.images?.posters && details.images.posters.length ? (
+                      <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingTop: 4 }}>
+                        {details.images.posters.slice(0, 4).map((poster) => (
+                          <Image
+                            key={poster.file_path}
+                            src={`${posterBase}${poster.file_path}`}
+                            alt="Poster"
+                            width={120}
+                            height={180}
+                            sizes="120px"
+                            style={{ width: 120, height: "auto", borderRadius: 8, border: `1px solid ${theme.colors.border}` }}
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <Muted>Select a title to load details.</Muted>
+                )}
+              </CardBody>
+            </Card>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
+  );
+}
 type EmptyStateProps = {
   onClear: () => void;
 };

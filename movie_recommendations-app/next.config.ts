@@ -4,8 +4,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   images: {
     remotePatterns: [
-      { protocol: "https", hostname: "image.tmdb.org" },
-      { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "http", hostname: "image.tmdb.org" },
+      { protocol: "http", hostname: "images.unsplash.com" },
     ],
   },
   compiler: {
