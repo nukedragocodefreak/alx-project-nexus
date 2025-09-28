@@ -66,8 +66,13 @@ const MovieCard: React.FC<MovieCardProps> = ({
               onClick={onInfo}
               disabled={!onInfo}
               aria-label="More details"
+              style={{
+                background: onInfo ? "#eef2ff" : undefined,
+                color: onInfo ? "#1d4ed8" : theme.colors.subtext,
+                borderColor: onInfo ? "#bfdbfe" : theme.colors.border,
+              }}
             >
-              <Info size={16} />
+              <Info size={16} strokeWidth={2.4} />
             </Button>
           </div>
         </Overlay>
