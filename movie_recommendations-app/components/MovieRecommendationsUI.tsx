@@ -758,7 +758,10 @@ function EmptyState({ onClear }: EmptyStateProps) {
   <Card>      
     <CardBody style={{ minHeight: "30vh", display: "grid", placeItems: "center" }}>       
        <div style={{ maxWidth: 420, textAlign: "center", display: "grid", gap: 12 }}>          
-        <div style={{ width: 56, height: 56, margin: "0 auto", display: "grid", placeItems: "center", border: `1px solid ${theme.colors.border}`, background: "#fff", borderRadius: 16, boxShadow: theme.shadow, }}>            
+        <div style={{ width: 56, height: 56, margin: "0 auto", display: "grid", 
+          placeItems: "center", border: `1px solid ${theme.colors.border}`, 
+          background: "#fff", borderRadius: 16, boxShadow: theme.shadow, 
+          }}>            
           <Search size={20} />          
           </div>          
           <div style={{ fontWeight: 700 }}>No matches just yet</div>         
