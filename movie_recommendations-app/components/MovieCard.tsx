@@ -14,7 +14,7 @@ const MovieCard: React.FC<MovieCardProps> = ({
   onWatchlist,
   onInfo,
 }) => {
-  const meta = [movie.mediaType === "tv" ? "TV" : "Movie", movie.genres.slice(0, 3).join(", ")]
+  const meta = [movie.mediaType === "tv" ? "TV Show" : "Movie", movie.genres.slice(0, 3).join(", ")]
     .filter(Boolean)
     .join(" | ");
 

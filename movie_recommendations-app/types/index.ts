@@ -95,3 +95,7 @@ export type DetailsPanelProps = {
   onClose: () => void;
   posterBase: string;
 };
+
+export type EmptyStateProps = {
+  onClear: () => void;
+};
