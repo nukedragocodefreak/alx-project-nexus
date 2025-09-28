@@ -516,16 +516,57 @@ export default function MovieRecommendationsUI() {
   }, [activeFeed, query]);
   const posterPreviewBase = TMDB_IMG_URL ? TMDB_IMG_URL.replace("/w500", "/") : "";
   const preferredPosterSize = "w500";
-  return (<div>      <HeaderWrap>        <Container>          <Brand>            <AppBadge>              <Film size={20} />            </AppBadge>            <div>              <div style={{ fontWeight: 700 }}>FilmFinder</div>              <Muted>Powered by TMDb</Muted>            </div>          </Brand>          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>            <Button size="sm" variant={feedMediaType === "movie" ? "solid" : "outline"} onClick={() => handleFeedMediaTypeChange("movie")}>              Movies            </Button>            <Button size="sm" variant={feedMediaType === "tv" ? "solid" : "outline"} onClick={() => handleFeedMediaTypeChange("tv")}>              TV Shows            </Button>          </div>        </Container>        <Container style={{ paddingTop: 0 }}>          <InputWrap>            <LeftIcon>              <Search size={16} />            </LeftIcon>            <Input value={query} onChange={(event) => handleQueryChange(event.target.value)} placeholder="Search movies or TV shows" />          </InputWrap>          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>            <Button onClick={() => handleQueryChange("")}>              <X size={16} /> Clear search            </Button>          </div>        </Container>        <Container style={{ paddingTop: 8 }}>          <Tabs>            {tabsToRender.map((feed) => {
-    const Icon = feed.icon;
-    const isActive = activeFeed === feed.id;
-    const disabled = feed.id === "search" && !query.trim();
+  return (<div>      
+    <HeaderWrap>        
+    <Container>          
+      <Brand>            
+      <AppBadge>              
+        <Film size={20} />            
+        </AppBadge>            
+        <div>              
+          <div style={{ fontWeight: 700 }}>FilmFinder
+            </div>              
+            <Muted>Powered by TMDb</Muted>            
+            </div>          
+            </Brand>          
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>            
+              <Button size="sm" variant={feedMediaType === "movie" ? "solid" : "outline"} onClick={() => handleFeedMediaTypeChange("movie")}>              
+                Movies            
+                </Button>            
+                <Button size="sm" variant={feedMediaType === "tv" ? "solid" : "outline"} onClick={() => handleFeedMediaTypeChange("tv")}>              
+                  TV Shows            
+                  </Button>          
+                  </div>        
+                  </Container>        
+                  <Container style={{ paddingTop: 0 }}>          
+                    <InputWrap>            
+                    <LeftIcon>              
+                      <Search size={16} />           
+                       </LeftIcon>            
+                       <Input value={query} onChange={(event) => handleQueryChange(event.target.value)} placeholder="Search movies or TV shows" />          
+                       </InputWrap>          <
+                        div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>            
+                        <Button onClick={() => handleQueryChange("")}>             
+                           <X size={16} /> Clear search            
+                           </Button>          
+                           </div>        
+                           </Container>        
+                           <Container style={{ paddingTop: 8 }}>          
+                            <Tabs>            
+                              {tabsToRender.map((feed) => {
+                                const Icon = feed.icon;
+                                const isActive = activeFeed === feed.id;
+                                const disabled = feed.id === "search" && !query.trim();
     return (<TabBtn key={feed.id} active={isActive} onClick={() => {
       if (disabled)
         return;
       setActiveFeed(feed.id as FeedId);
-    }} disabled={disabled as boolean | undefined}>                  {Icon ? <Icon size={16} /> : null}                  {feed.label}                </TabBtn>);
-  })}          </Tabs>        
+    }} disabled={disabled as boolean | undefined}>                 
+     {Icon ? <Icon size={16} /> : null}                  
+     {feed.label}                
+     </TabBtn>);
+  })}          
+  </Tabs>        
   </Container>      
   </HeaderWrap>      
   <Main> <div style={{ position: "sticky", top: 100, display: "grid", gap: 16, height: "fit-content" }}>          
