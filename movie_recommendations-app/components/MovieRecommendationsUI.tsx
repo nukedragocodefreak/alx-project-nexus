@@ -2,24 +2,18 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import theme, { Components } from "@/components/theme";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, SlidersHorizontal, Sparkles, Film, Clock, TrendingUp, Loader2, Heart, X } from "lucide-react";
-import type { DetailsPanelProps, TmdbMovie, UiMovie, GenreState, SelectedItem, TmdbDetails, TmdbListResponse } from "@/types";
+import type { EmptyStateProps, FeedId, FeedConfig, DetailsPanelProps, TmdbMovie, UiMovie, GenreState, SelectedItem, TmdbDetails, TmdbListResponse } from "@/types";
 import { fetchJSON } from "@/Utils/index";
 import MovieCard from "@/components/MovieCard";
 import Image from "next/image";
 const { HeaderWrap, Container, Brand, AppBadge, Muted, Button, InputWrap, Input, LeftIcon, Kbd, Tabs, TabBtn, Main, Card, CardBody, CardHeader, CardTitle, CardDescription, SliderRow, Range, GenrePills, Pill, Grid, Danger, } = Components;
 const TMDB_IMG_URL = process.env.NEXT_PUBLIC_TMDB_IMAGE_BASE_URL || "https://image.tmdb.org/t/p/w500";
 const FALLBACK_POSTER = "https://images.unsplash.com/photo-1496440737103-cd596325d314?q=80&w=1200&auto=format&fit=crop";
+const ITEMS_PER_PAGE = 20;
 const FALLBACK_GENRES = ["Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary", "Drama", "Fantasy", "History", "Horror", "Mystery", "Romance", "Sci-Fi", "Thriller",];
 const FAVORITES_STORAGE_KEY = "FilmFinder:favorites:v1";
 const WATCHLIST_STORAGE_KEY = "FilmFinder:watchlist:v1";
-type FeedId = "popular" | "trending" | "now_playing" | "upcoming" | "discover" | "favorites" | "watchlist" | "search";
-type FeedConfig = {
-  id: FeedId;
-  label: string;
-  icon?: React.ComponentType<{
-    size?: number;
-  }>;
-};
+
 const FEEDS: FeedConfig[] = [{ id: "popular", label: "Popular", icon: Sparkles }, { id: "trending", label: "Trending", icon: TrendingUp }, { id: "now_playing", label: "Now Playing", icon: Clock }, { id: "upcoming", label: "Upcoming", icon: Film }, { id: "discover", label: "Discover", icon: SlidersHorizontal }, { id: "favorites", label: "Favorites", icon: Heart }, { id: "watchlist", label: "Watchlist", icon: Clock },];
 const TRENDING_MEDIA_TYPES: Array<{
   id: "movie" | "tv";
@@ -68,6 +62,12 @@ export default function MovieRecommendationsUI() {
   const [details, setDetails] = useState<TmdbDetails | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  useEffect(() => {
+    setPage(1);
+  }, [activeFeed, feedMediaType, trendingMediaType, trendingWindow, minRating, activeGenres, query]);
+
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
@@ -405,6 +405,7 @@ export default function MovieRecommendationsUI() {
             url = `/api/tmdb?fn=popular&mediaType=${feedMediaType}`;
             break;
         }
+        params.set("page", String(page));
         const finalUrl = params.toString()
           ? `${url}${url.includes("?") ? "&" : "?"}${params.toString()}`
           : url;
@@ -414,6 +415,8 @@ export default function MovieRecommendationsUI() {
           : Array.isArray(json?.items)
           ? json.items
           : [];
+        const totalFromResponse = Math.max(1, Math.min(Number(json?.total_pages) || 1, 500));
+        setTotalPages(totalFromResponse);
         const mapped: UiMovie[] = results.map((item) => {
           const resolvedMediaType =
             item.media_type === "tv" || fallbackMediaType === "tv" ? "tv" : "movie";
@@ -453,7 +456,7 @@ export default function MovieRecommendationsUI() {
     }
     load();
     return () => controller.abort();
-  }, [activeFeed, activeGenres, feedMediaType, genreCache, genreNameToId, query, trendingMediaType, trendingWindow]);
+  }, [activeFeed, activeGenres, feedMediaType, genreCache, genreNameToId, query, trendingMediaType, trendingWindow, page]);
   useEffect(() => {
     if (!selected) {
       setDetails(null);
@@ -495,6 +498,26 @@ export default function MovieRecommendationsUI() {
     return movies;
   }, [activeFeed, watchlist, catalog, favoriteLibrary, movies]);
   const filtered = useMemo(() => { return currentList.filter((movie) => { const matchesRating = movie.rating >= minRating; const matchesGenres = activeGenres.length === 0 || activeGenres.every((g) => movie.genres.includes(g)); return matchesRating && matchesGenres; }); }, [currentList, minRating, activeGenres]);
+  const effectiveTotalPages = useMemo(() => {
+    if (activeFeed === "favorites" || activeFeed === "watchlist") {
+      return Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+    }
+    return Math.max(1, totalPages);
+  }, [activeFeed, filtered.length, totalPages]);
+
+  useEffect(() => {
+    if (page > effectiveTotalPages) {
+      setPage(effectiveTotalPages);
+    }
+  }, [page, effectiveTotalPages]);
+
+  const paginated = useMemo(() => {
+    if (activeFeed === "favorites" || activeFeed === "watchlist") {
+      const start = (page - 1) * ITEMS_PER_PAGE;
+      return filtered.slice(start, start + ITEMS_PER_PAGE);
+    }
+    return filtered;
+  }, [filtered, page, activeFeed]);
   const selectedMovie = useMemo(() => {
     if (!selected) {
       return null;
@@ -614,10 +637,76 @@ export default function MovieRecommendationsUI() {
                                                                                  </div>       
                                                                                       </CardBody>           
                                                                                        </Card>)}          
-                                                                  {error && <Danger>TMDb error: {error}</Danger>} 
-                                                                           <AnimatePresence mode="popLayout">            
-                                                                    {loading ? (<Grid>  
-                                                                                  {Array.from({ length: 8 }).map((_, index) => (<motion.div key={index} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} style={{ height: 280, borderRadius: 12, background: theme.colors.muted, border: `1px solid ${theme.colors.border}`, }} />))}              </Grid>) : filtered.length === 0 ? (<EmptyState onClear={() => { setActiveGenres([]); setMinRating(7); }} />) : (<Grid>                {filtered.map((movie, index) => (<motion.div key={movie.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ delay: index * 0.02 }}>                    <MovieCard movie={movie} liked={Boolean(likes[movie.id])} watchlisted={watchlist.includes(movie.id)} onLike={() => toggleLike(movie.id)} onWatchlist={() => toggleWatchlist(movie.id)} onInfo={() => setSelected({ id: movie.id, mediaType: movie.mediaType })} />                  </motion.div>))}              </Grid>)}          </AnimatePresence>          <DetailsPanel movie={selectedMovie} details={details} loading={detailsLoading} error={detailsError} onClose={() => setSelected(null)} posterBase={`${posterPreviewBase}${preferredPosterSize}`} />        </section>      </Main>    </div>);
+                                                                  {error && <Danger>TMDb error: {error}</Danger>}
+          {effectiveTotalPages > 1 ? (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                disabled={page === 1}
+              >
+                Previous
+              </Button>
+              <div style={{ fontSize: 13, color: theme.colors.subtext }}>
+                Page {page} of {effectiveTotalPages}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((prev) => Math.min(effectiveTotalPages, prev + 1))}
+                disabled={page >= effectiveTotalPages}
+              >
+                Next
+              </Button>
+            </div>
+          ) : null}
+          <AnimatePresence mode="popLayout">
+            {loading ? (
+              <Grid>
+                {Array.from({ length: 8 }).map((_, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    style={{ height: 280, borderRadius: 12, background: theme.colors.muted, border: `1px solid ${theme.colors.border}` }}
+                  />
+                ))}
+              </Grid>
+            ) : filtered.length === 0 ? (
+              <EmptyState
+                onClear={() => {
+                  setActiveGenres([]);
+                  setMinRating(7);
+                }}
+              />
+            ) : (
+              <Grid>
+                {paginated.map((movie, index) => (
+                  <motion.div
+                    key={movie.id}
+                    layout
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ delay: index * 0.02 }}
+                  >
+                    <MovieCard
+                      movie={movie}
+                      liked={Boolean(likes[movie.id])}
+                      watchlisted={watchlist.includes(movie.id)}
+                      onLike={() => toggleLike(movie.id)}
+                      onWatchlist={() => toggleWatchlist(movie.id)}
+                      onInfo={() => setSelected({ id: movie.id, mediaType: movie.mediaType })}
+                    />
+                  </motion.div>
+                ))}
+              </Grid>
+            )}
+          </AnimatePresence>
+        <DetailsPanel movie={selectedMovie} details={details} loading={detailsLoading} error={detailsError} onClose={() => setSelected(null)} posterBase={`${posterPreviewBase}${preferredPosterSize}`} />        </section>      </Main>    </div>);
 }
 
 function DetailsPanel({ movie, details, loading, error, onClose, posterBase }: DetailsPanelProps) {
@@ -753,9 +842,8 @@ function DetailsPanel({ movie, details, loading, error, onClose, posterBase }: D
     </AnimatePresence>
   );
 }
-type EmptyStateProps = {
-  onClear: () => void;
-};
+
 function EmptyState({ onClear }: EmptyStateProps) { return (<Card>      <CardBody style={{ minHeight: "30vh", display: "grid", placeItems: "center" }}>        <div style={{ maxWidth: 420, textAlign: "center", display: "grid", gap: 12 }}>          <div style={{ width: 56, height: 56, margin: "0 auto", display: "grid", placeItems: "center", border: `1px solid ${theme.colors.border}`, background: "#fff", borderRadius: 16, boxShadow: theme.shadow, }}>            <Search size={20} />          </div>          <div style={{ fontWeight: 700 }}>No matches just yet</div>          <div style={{ fontSize: 14, color: theme.colors.subtext }}>            Adjust your filters or try a different search term. You can also reset filters to start fresh.          </div>          <Button variant="outline" size="sm" onClick={onClear} style={{ width: "fit-content", margin: "0 auto" }}>            Reset filters          </Button>        </div>      </CardBody>    </Card>); }
+
 
 
