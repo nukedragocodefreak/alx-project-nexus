@@ -9,6 +9,7 @@ import Image from "next/image";
 const { HeaderWrap, Container, Brand, AppBadge, Muted, Button, InputWrap, Input, LeftIcon, Kbd, Tabs, TabBtn, Main, Card, CardBody, CardHeader, CardTitle, CardDescription, SliderRow, Range, GenrePills, Pill, Grid, Danger, } = Components;
 const TMDB_IMG_URL = process.env.NEXT_PUBLIC_TMDB_IMAGE_BASE_URL || "https://image.tmdb.org/t/p/w500";
 const FALLBACK_POSTER = "https://images.unsplash.com/photo-1496440737103-cd596325d314?q=80&w=1200&auto=format&fit=crop";
+const ITEMS_PER_PAGE = 20;
 const FALLBACK_GENRES = ["Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary", "Drama", "Fantasy", "History", "Horror", "Mystery", "Romance", "Sci-Fi", "Thriller",];
 const FAVORITES_STORAGE_KEY = "FilmFinder:favorites:v1";
 const WATCHLIST_STORAGE_KEY = "FilmFinder:watchlist:v1";
@@ -68,6 +69,12 @@ export default function MovieRecommendationsUI() {
   const [details, setDetails] = useState<TmdbDetails | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  useEffect(() => {
+    setPage(1);
+  }, [activeFeed, feedMediaType, trendingMediaType, trendingWindow, minRating, activeGenres, query]);
+
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
@@ -405,6 +412,7 @@ export default function MovieRecommendationsUI() {
             url = `/api/tmdb?fn=popular&mediaType=${feedMediaType}`;
             break;
         }
+        params.set("page", String(page));
         const finalUrl = params.toString()
           ? `${url}${url.includes("?") ? "&" : "?"}${params.toString()}`
           : url;
@@ -414,6 +422,8 @@ export default function MovieRecommendationsUI() {
           : Array.isArray(json?.items)
           ? json.items
           : [];
+        const totalFromResponse = Math.max(1, Math.min(Number(json?.total_pages) || 1, 500));
+        setTotalPages(totalFromResponse);
         const mapped: UiMovie[] = results.map((item) => {
           const resolvedMediaType =
             item.media_type === "tv" || fallbackMediaType === "tv" ? "tv" : "movie";
@@ -453,7 +463,7 @@ export default function MovieRecommendationsUI() {
     }
     load();
     return () => controller.abort();
-  }, [activeFeed, activeGenres, feedMediaType, genreCache, genreNameToId, query, trendingMediaType, trendingWindow]);
+  }, [activeFeed, activeGenres, feedMediaType, genreCache, genreNameToId, query, trendingMediaType, trendingWindow, page]);
   useEffect(() => {
     if (!selected) {
       setDetails(null);
@@ -495,6 +505,26 @@ export default function MovieRecommendationsUI() {
     return movies;
   }, [activeFeed, watchlist, catalog, favoriteLibrary, movies]);
   const filtered = useMemo(() => { return currentList.filter((movie) => { const matchesRating = movie.rating >= minRating; const matchesGenres = activeGenres.length === 0 || activeGenres.every((g) => movie.genres.includes(g)); return matchesRating && matchesGenres; }); }, [currentList, minRating, activeGenres]);
+  const effectiveTotalPages = useMemo(() => {
+    if (activeFeed === "favorites" || activeFeed === "watchlist") {
+      return Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+    }
+    return Math.max(1, totalPages);
+  }, [activeFeed, filtered.length, totalPages]);
+
+  useEffect(() => {
+    if (page > effectiveTotalPages) {
+      setPage(effectiveTotalPages);
+    }
+  }, [page, effectiveTotalPages]);
+
+  const paginated = useMemo(() => {
+    if (activeFeed === "favorites" || activeFeed === "watchlist") {
+      const start = (page - 1) * ITEMS_PER_PAGE;
+      return filtered.slice(start, start + ITEMS_PER_PAGE);
+    }
+    return filtered;
+  }, [filtered, page, activeFeed]);
   const selectedMovie = useMemo(() => {
     if (!selected) {
       return null;
@@ -614,10 +644,76 @@ export default function MovieRecommendationsUI() {
                                                                                  </div>       
                                                                                       </CardBody>           
                                                                                        </Card>)}          
-                                                                  {error && <Danger>TMDb error: {error}</Danger>} 
-                                                                           <AnimatePresence mode="popLayout">            
-                                                                    {loading ? (<Grid>  
-                                                                                  {Array.from({ length: 8 }).map((_, index) => (<motion.div key={index} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} style={{ height: 280, borderRadius: 12, background: theme.colors.muted, border: `1px solid ${theme.colors.border}`, }} />))}              </Grid>) : filtered.length === 0 ? (<EmptyState onClear={() => { setActiveGenres([]); setMinRating(7); }} />) : (<Grid>                {filtered.map((movie, index) => (<motion.div key={movie.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ delay: index * 0.02 }}>                    <MovieCard movie={movie} liked={Boolean(likes[movie.id])} watchlisted={watchlist.includes(movie.id)} onLike={() => toggleLike(movie.id)} onWatchlist={() => toggleWatchlist(movie.id)} onInfo={() => setSelected({ id: movie.id, mediaType: movie.mediaType })} />                  </motion.div>))}              </Grid>)}          </AnimatePresence>          <DetailsPanel movie={selectedMovie} details={details} loading={detailsLoading} error={detailsError} onClose={() => setSelected(null)} posterBase={`${posterPreviewBase}${preferredPosterSize}`} />        </section>      </Main>    </div>);
+                                                                  {error && <Danger>TMDb error: {error}</Danger>}
+          <AnimatePresence mode="popLayout">
+            {loading ? (
+              <Grid>
+                {Array.from({ length: 8 }).map((_, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    style={{ height: 280, borderRadius: 12, background: theme.colors.muted, border: `1px solid ${theme.colors.border}` }}
+                  />
+                ))}
+              </Grid>
+            ) : filtered.length === 0 ? (
+              <EmptyState
+                onClear={() => {
+                  setActiveGenres([]);
+                  setMinRating(7);
+                }}
+              />
+            ) : (
+              <Grid>
+                {paginated.map((movie, index) => (
+                  <motion.div
+                    key={movie.id}
+                    layout
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ delay: index * 0.02 }}
+                  >
+                    <MovieCard
+                      movie={movie}
+                      liked={Boolean(likes[movie.id])}
+                      watchlisted={watchlist.includes(movie.id)}
+                      onLike={() => toggleLike(movie.id)}
+                      onWatchlist={() => toggleWatchlist(movie.id)}
+                      onInfo={() => setSelected({ id: movie.id, mediaType: movie.mediaType })}
+                    />
+                  </motion.div>
+                ))}
+              </Grid>
+            )}
+          </AnimatePresence>
+          {effectiveTotalPages > 1 ? (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16 }}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                disabled={page === 1}
+              >
+                Previous
+              </Button>
+              <div style={{ fontSize: 13, color: theme.colors.subtext }}>
+                Page {page} of {effectiveTotalPages}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((prev) => Math.min(effectiveTotalPages, prev + 1))}
+                disabled={page >= effectiveTotalPages}
+              >
+                Next
+              </Button>
+            </div>
+          ) : null}
+        <DetailsPanel movie={selectedMovie} details={details} loading={detailsLoading} error={detailsError} onClose={() => setSelected(null)} posterBase={`${posterPreviewBase}${preferredPosterSize}`} />        </section>      </Main>    </div>);
 }
 
 function DetailsPanel({ movie, details, loading, error, onClose, posterBase }: DetailsPanelProps) {
