@@ -647,14 +647,20 @@ export default function MovieRecommendationsUI() {
           ) : null}
                   <AnimatePresence mode="popLayout">            
                   {loading ? (<Grid>  
-                   {Array.from({ length: 8 }).map((_, index) => (<motion.div key={index} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} style={{ height: 280, borderRadius: 12, background: theme.colors.muted, border: `1px solid ${theme.colors.border}`, }} />))}              
-                   </Grid>) : filtered.length === 0 ? (<EmptyState onClear={() => { setActiveGenres([]); setMinRating(7); }} />) : (<Grid> 
-                      {paginated.map((movie, index) => (<motion.div key={movie.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ delay: index * 0.02 }}>                    
+                   {Array.from({ length: 8 }).map((_, index) => 
+                    (<motion.div key={index} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} 
+                    style={{ height: 280, borderRadius: 12, background: theme.colors.muted, border: `1px solid ${theme.colors.border}`, }} />))}              
+                   </Grid>) : filtered.length === 0 ? (<EmptyState onClear={() => { setActiveGenres([]); setMinRating(7); }} />) : (
+                    <Grid> 
+                      {paginated.map((movie, index) => (<motion.div key={movie.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} 
+                      exit={{ opacity: 0, y: -10 }} transition={{ delay: index * 0.02 }}>                    
                         <MovieCard movie={movie} liked={Boolean(likes[movie.id])} watchlisted={watchlist.includes(movie.id)} onLike={() => toggleLike(movie.id)} onWatchlist={() => toggleWatchlist(movie.id)} onInfo={() => setSelected({ id: movie.id, mediaType: movie.mediaType })} />
                         </motion.div>))}              
-                        </Grid>)}          
+                        </Grid>
+                      )}          
                         </AnimatePresence>          
-                        <DetailsPanel movie={selectedMovie} details={details} loading={detailsLoading} error={detailsError} onClose={handleCloseDetails} posterBase={`${posterPreviewBase}${preferredPosterSize}`} />        
+                        <DetailsPanel movie={selectedMovie} details={details} loading={detailsLoading} error={detailsError} onClose={handleCloseDetails} 
+                        posterBase={`${posterPreviewBase}${preferredPosterSize}`} />        
                         </section>      
                         </Main>    
                         </div>);
