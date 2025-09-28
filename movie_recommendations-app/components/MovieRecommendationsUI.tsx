@@ -11,6 +11,7 @@ const TMDB_IMG_URL = process.env.NEXT_PUBLIC_TMDB_IMAGE_BASE_URL || "https://ima
 const FALLBACK_POSTER = "https://images.unsplash.com/photo-1496440737103-cd596325d314?q=80&w=1200&auto=format&fit=crop";
 const FALLBACK_GENRES = ["Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary", "Drama", "Fantasy", "History", "Horror", "Mystery", "Romance", "Sci-Fi", "Thriller",];
 const FAVORITES_STORAGE_KEY = "FilmFinder:favorites:v1";
+const WATCHLIST_STORAGE_KEY = "FilmFinder:watchlist:v1";
 type FeedId = "popular" | "trending" | "now_playing" | "upcoming" | "discover" | "favorites" | "watchlist" | "search";
 type FeedConfig = {
   id: FeedId;
@@ -50,6 +51,7 @@ export default function MovieRecommendationsUI() {
   const [likes, setLikes] = useState<Record<string, boolean>>({});
   const [favoriteLibrary, setFavoriteLibrary] = useState<Record<string, UiMovie>>({});
   const favoritesReadyRef = useRef(false);
+  const watchlistReadyRef = useRef(false);
   const [movies, setMovies] = useState<UiMovie[]>([]);
   const [catalog, setCatalog] = useState<Record<string, UiMovie>>({});
   const [genreNameToId, setGenreNameToId] = useState<Record<string, number>>({});
@@ -145,6 +147,98 @@ export default function MovieRecommendationsUI() {
     }
 
   }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    try {
+      const raw = window.localStorage.getItem(WATCHLIST_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as unknown;
+        const records: Record<string, UiMovie> = {};
+        const appendMovie = (entry: unknown) => {
+          if (!entry || typeof entry !== "object") {
+            return;
+          }
+          const movie = entry as Partial<UiMovie> & { id?: string | number };
+          if (movie.id === undefined || movie.id === null) {
+            return;
+          }
+          const id = String(movie.id);
+          const genres = Array.isArray(movie.genres)
+            ? movie.genres.filter((item): item is string => typeof item === "string")
+            : [];
+          const ratingValue =
+            typeof movie.rating === "number"
+              ? movie.rating
+              : Number(movie.rating ?? 0) || 0;
+
+          records[id] = {
+            id,
+            title: movie.title ?? "Untitled",
+            year: movie.year ?? "-",
+            genres,
+            rating: ratingValue,
+            runtime: typeof movie.runtime === "number" ? movie.runtime : undefined,
+            poster: movie.poster ?? FALLBACK_POSTER,
+            overview: movie.overview ?? "",
+            trending: Boolean(movie.trending),
+            mediaType: movie.mediaType === "tv" ? "tv" : "movie",
+          };
+        };
+
+        if (Array.isArray(parsed)) {
+          parsed.forEach(appendMovie);
+        }
+        else if (parsed && typeof parsed === "object") {
+          Object.values(parsed).forEach(appendMovie);
+        }
+
+        const uniqueIds = Object.keys(records);
+        if (uniqueIds.length) {
+          setWatchlist(uniqueIds);
+          setCatalog((previous) => {
+            const next = { ...previous };
+            let changed = false;
+            uniqueIds.forEach((id) => {
+              const movie = records[id];
+              if (movie && !next[id]) {
+                next[id] = movie;
+                changed = true;
+              }
+            });
+            return changed ? next : previous;
+          });
+        }
+      }
+    }
+    catch (storageError) {
+      console.warn("Failed to restore watchlist from storage", storageError);
+    }
+    finally {
+      watchlistReadyRef.current = true;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!watchlistReadyRef.current) {
+      return;
+    }
+    if (typeof window === "undefined") {
+      return;
+    }
+    try {
+      const snapshot = JSON.stringify(
+        watchlist
+          .map((id) => catalog[id])
+          .filter((movie): movie is UiMovie => Boolean(movie))
+      );
+      window.localStorage.setItem(WATCHLIST_STORAGE_KEY, snapshot);
+    }
+    catch (storageError) {
+      console.warn("Failed to persist watchlist to storage", storageError);
+    }
+  }, [watchlist, catalog]);
   const handleFeedMediaTypeChange = useCallback((type: "movie" | "tv") => {
     setFeedMediaType(type);
     if (activeFeed === "trending") {
@@ -417,7 +511,23 @@ export default function MovieRecommendationsUI() {
     }
   }
   function toggleGenre(genre: string) { setActiveGenres((prev) => prev.includes(genre) ? prev.filter((item) => item !== genre) : [...prev, genre]); }
-  function toggleWatchlist(id: string) { setWatchlist((prev) => prev.includes(id) ? prev.filter((entry) => entry !== id) : [...prev, id]); }
+  function toggleWatchlist(id: string) {
+    const removing = watchlist.includes(id);
+    setWatchlist((prev) => (prev.includes(id) ? prev.filter((entry) => entry !== id) : [...prev, id]));
+    if (removing) {
+      return;
+    }
+    const source = favoriteLibrary[id] || catalog[id] || movies.find((item) => item.id === id);
+    if (!source) {
+      return;
+    }
+    setCatalog((previous) => {
+      if (previous[id]) {
+        return previous;
+      }
+      return { ...previous, [id]: source };
+    });
+  }
   function toggleLike(id: string) {
     setFavoriteLibrary((prevLibrary) => {
       const isFavorite = Boolean(prevLibrary[id]);
