@@ -13,6 +13,9 @@ export type TmdbMovie = {
 
 export type TmdbListResponse = {
   results?: TmdbMovie[];
+  page?: number;
+  total_pages?: number;
+  total_results?: number;
   items?: TmdbMovie[];
 };
 

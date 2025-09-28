@@ -11,6 +11,7 @@ const TMDB_IMG_URL = process.env.NEXT_PUBLIC_TMDB_IMAGE_BASE_URL || "https://ima
 const FALLBACK_POSTER = "https://images.unsplash.com/photo-1496440737103-cd596325d314?q=80&w=1200&auto=format&fit=crop";
 const FALLBACK_GENRES = ["Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary", "Drama", "Fantasy", "History", "Horror", "Mystery", "Romance", "Sci-Fi", "Thriller",];
 const FAVORITES_STORAGE_KEY = "scenescout:favorites:v1";
+const ITEMS_PER_PAGE = 20;
 type FeedId = "popular" | "trending" | "now_playing" | "upcoming" | "discover" | "favorites" | "watchlist" | "search";
 type FeedConfig = {
   id: FeedId;
@@ -58,6 +59,8 @@ export default function MovieRecommendationsUI() {
     movie: makeEmptyGenreState(),
     tv: makeEmptyGenreState(),
   });
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [trendingMediaType, setTrendingMediaType] = useState<"movie" | "tv">("movie");
@@ -258,6 +261,10 @@ export default function MovieRecommendationsUI() {
   }, [feedMediaType, genreCache]);
   useEffect(() => { fetchJSON<TmdbConfiguration>("/api/tmdb?fn=configuration").then((data) => { setConfiguration(data); }).catch((err: Error) => { setConfigurationError(err.message); }); }, []);
   useEffect(() => {
+    setPage(1);
+  }, [activeFeed, query, feedMediaType, trendingMediaType, trendingWindow, minRating, activeGenres]);
+
+  useEffect(() => {
     if (activeFeed !== "trending") {
       setTrendingMediaType(feedMediaType);
     }
@@ -266,22 +273,45 @@ export default function MovieRecommendationsUI() {
     if (activeFeed === "watchlist") {
       setLoading(false);
       setError(null);
+      const total = Math.max(1, Math.ceil(watchlist.length / ITEMS_PER_PAGE));
+      setTotalPages(total);
+      if (page > total) {
+        setPage(total);
+      }
       return;
     }
+
+    if (activeFeed === "favorites") {
+      setLoading(false);
+      setError(null);
+      const favoriteCount = Object.keys(favoriteLibrary).length;
+      const total = Math.max(1, Math.ceil(favoriteCount / ITEMS_PER_PAGE));
+      setTotalPages(total);
+      if (page > total) {
+        setPage(total);
+      }
+      return;
+    }
+
     if (activeFeed === "search" && !query.trim()) {
       setMovies([]);
       setLoading(false);
       setError(null);
+      setTotalPages(1);
       return;
     }
+
     const controller = new AbortController();
+
     async function load() {
       setLoading(true);
       setError(null);
+
       try {
         let url = `/api/tmdb?fn=popular&mediaType=${feedMediaType}`;
         const params = new URLSearchParams();
         let fallbackMediaType: "movie" | "tv" = feedMediaType;
+
         switch (activeFeed) {
           case "popular":
             url = `/api/tmdb?fn=popular&mediaType=${feedMediaType}`;
@@ -314,21 +344,34 @@ export default function MovieRecommendationsUI() {
             url = `/api/tmdb?fn=popular&mediaType=${feedMediaType}`;
             break;
         }
+
+        params.set("page", String(page));
+
         const finalUrl = params.toString()
           ? `${url}${url.includes("?") ? "&" : "?"}${params.toString()}`
           : url;
+
         const json = await fetchJSON<TmdbListResponse>(finalUrl, { signal: controller.signal });
+        const totalFromResponse = Math.max(1, json?.total_pages ?? 1);
+        setTotalPages(totalFromResponse);
+        if (page > totalFromResponse) {
+          setPage(totalFromResponse);
+          return;
+        }
+
         const results: TmdbMovie[] = Array.isArray(json?.results)
           ? json.results
           : Array.isArray(json?.items)
           ? json.items
           : [];
+
         const mapped: UiMovie[] = results.map((item) => {
           const resolvedMediaType =
             item.media_type === "tv" || fallbackMediaType === "tv" ? "tv" : "movie";
           const releaseDate = resolvedMediaType === "tv" ? item.first_air_date : item.release_date;
           const genreDict =
             resolvedMediaType === "tv" ? genreCache.tv.dict : genreCache.movie.dict;
+
           return {
             id: String(item.id),
             title: item.title || item.name || "Untitled",
@@ -342,6 +385,7 @@ export default function MovieRecommendationsUI() {
             mediaType: resolvedMediaType,
           };
         });
+
         setMovies(mapped);
         setCatalog((prev) => {
           const next = { ...prev };
@@ -360,9 +404,10 @@ export default function MovieRecommendationsUI() {
         setLoading(false);
       }
     }
+
     load();
     return () => controller.abort();
-  }, [activeFeed, activeGenres, feedMediaType, genreCache, genreNameToId, query, trendingMediaType, trendingWindow]);
+  }, [activeFeed, query, trendingMediaType, trendingWindow, activeGenres, genreNameToId, feedMediaType, page, favoriteLibrary, watchlist, genreCache]);
   useEffect(() => {
     if (!selected) {
       setDetails(null);
@@ -404,6 +449,24 @@ export default function MovieRecommendationsUI() {
     return movies;
   }, [activeFeed, watchlist, catalog, favoriteLibrary, movies]);
   const filtered = useMemo(() => { return currentList.filter((movie) => { const matchesRating = movie.rating >= minRating; const matchesGenres = activeGenres.length === 0 || activeGenres.every((g) => movie.genres.includes(g)); return matchesRating && matchesGenres; }); }, [currentList, minRating, activeGenres]);
+  useEffect(() => {
+    if (activeFeed === "watchlist" || activeFeed === "favorites") {
+      const total = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+      setTotalPages(total);
+      if (page > total) {
+        setPage(total);
+      }
+    }
+  }, [activeFeed, filtered.length, page]);
+
+  const paginated = useMemo(() => {
+    if (activeFeed === "watchlist" || activeFeed === "favorites") {
+      const start = (page - 1) * ITEMS_PER_PAGE;
+      return filtered.slice(start, start + ITEMS_PER_PAGE);
+    }
+    return filtered;
+  }, [filtered, activeFeed, page]);
+
   const selectedMovie = useMemo(() => {
     if (!selected) {
       return null;
@@ -447,6 +510,13 @@ export default function MovieRecommendationsUI() {
       return nextLibrary;
     });
   }
+  const handlePageChange = useCallback((nextPage: number) => {
+    setPage((current) => {
+      const clamped = Math.max(1, Math.min(nextPage, totalPages));
+      return clamped;
+    });
+  }, [totalPages]);
+
   const tabsToRender = useMemo(() => {
     if (activeFeed === "search" && query.trim()) {
       return [...FEEDS, { id: "search", label: "Search", icon: undefined }];
@@ -534,9 +604,42 @@ export default function MovieRecommendationsUI() {
                                                                                       </CardBody>           
                                                                                        </Card>)}          
                                                                   {error && <Danger>TMDb error: {error}</Danger>} 
+          {totalPages > 1 ? (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: 8,
+              }}
+            >
+              <div style={{ fontSize: 13, color: theme.colors.subtext }}>
+                Page {page} of {totalPages}
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(page - 1)}
+                  disabled={page <= 1}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(page + 1)}
+                  disabled={page >= totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          ) : null}
                                                                            <AnimatePresence mode="popLayout">            
                                                                     {loading ? (<Grid>  
-                                                                                  {Array.from({ length: 8 }).map((_, index) => (<motion.div key={index} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} style={{ height: 280, borderRadius: 12, background: theme.colors.muted, border: `1px solid ${theme.colors.border}`, }} />))}              </Grid>) : filtered.length === 0 ? (<EmptyState onClear={() => { setActiveGenres([]); setMinRating(7); }} />) : (<Grid>                {filtered.map((movie, index) => (<motion.div key={movie.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ delay: index * 0.02 }}>                    <MovieCard movie={movie} liked={Boolean(likes[movie.id])} watchlisted={watchlist.includes(movie.id)} onLike={() => toggleLike(movie.id)} onWatchlist={() => toggleWatchlist(movie.id)} onInfo={() => setSelected({ id: movie.id, mediaType: movie.mediaType })} />                  </motion.div>))}              </Grid>)}          </AnimatePresence>          <DetailsPanel movie={selectedMovie} details={details} loading={detailsLoading} error={detailsError} onClose={() => setSelected(null)} posterBase={`${posterPreviewBase}${preferredPosterSize}`} />        </section>      </Main>    </div>);
+                                                                                  {Array.from({ length: 8 }).map((_, index) => (<motion.div key={index} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} style={{ height: 280, borderRadius: 12, background: theme.colors.muted, border: `1px solid ${theme.colors.border}`, }} />))}              </Grid>) : filtered.length === 0 ? (<EmptyState onClear={() => { setActiveGenres([]); setMinRating(7); }} />) : (<Grid>                {paginated.map((movie, index) => (<motion.div key={movie.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ delay: index * 0.02 }}>                    <MovieCard movie={movie} liked={Boolean(likes[movie.id])} watchlisted={watchlist.includes(movie.id)} onLike={() => toggleLike(movie.id)} onWatchlist={() => toggleWatchlist(movie.id)} onInfo={() => setSelected({ id: movie.id, mediaType: movie.mediaType })} />                  </motion.div>))}              </Grid>)}          </AnimatePresence>          <DetailsPanel movie={selectedMovie} details={details} loading={detailsLoading} error={detailsError} onClose={() => setSelected(null)} posterBase={`${posterPreviewBase}${preferredPosterSize}`} />        </section>      </Main>    </div>);
 }
 
 function DetailsPanel({ movie, details, loading, error, onClose, posterBase }: DetailsPanelProps) { return (<AnimatePresence>      {movie ? (<motion.div key={movie.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} transition={{ duration: 0.2 }}>          <Card>            <CardHeader style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>              <div>                <CardTitle>{movie.title}</CardTitle>                <CardDescription>                  {movie.mediaType === "tv" ? "TV details" : "Movie details"} sourced from TMDb                </CardDescription>              </div>              <Button variant="ghost" size="icon" onClick={onClose}>                <X size={16} />              </Button>            </CardHeader>            <CardBody style={{ display: "grid", gap: 12 }}>              {loading ? (<div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14 }}>                  <Loader2 size={16} /> Loading details...                </div>) : error ? (<Danger>{error}</Danger>) : details ? (<>                  <div style={{ fontSize: 14 }}>                    <strong>Overview:</strong>                    <div style={{ marginTop: 6 }}>{details.overview || "No overview provided."}</div>                  </div>                  {details.tagline ? (<div style={{ fontStyle: "italic", color: theme.colors.subtext }}>                      &quot;{details.tagline}&quot;                    </div>) : null}                  <div style={{ display: "flex", flexWrap: "wrap", gap: 12, fontSize: 13 }}>                    <span>                      <strong>Year:</strong> {movie.year}                    </span>                    <span>                      <strong>Rating:</strong> {movie.rating.toFixed(1)}                    </span>                    {details.runtime ? (<span>                        <strong>Runtime:</strong> {details.runtime} min                      </span>) : null}                    {details.episode_run_time && details.episode_run_time.length ? (<span>                        <strong>Episode runtime:</strong> {details.episode_run_time[0]} min                      </span>) : null}                  </div>                  <div style={{ fontSize: 13 }}>                    <strong>Genres:</strong> {(details.genres || []).map((g) => g.name).join(", ") || "-"}                  </div>                  <div style={{ fontSize: 13 }}>                    <strong>Top cast:</strong>{" "}                    {(details.credits?.cast || []).slice(0, 5).map((person) => (person.character ? `${person.name} as ${person.character}` : person.name)).join(", ") || "Unavailable"}                  </div>                  {details.images?.posters && details.images.posters.length ? (<div style={{ display: "flex", gap: 12, overflowX: "auto", paddingTop: 4 }}>                      {details.images.posters.slice(0, 4).map((poster) => (<Image key={poster.file_path} src={`${posterBase}${poster.file_path}`} alt="Poster" width={120} height={180} sizes="120px" style={{ width: 120, height: "auto", borderRadius: 8, border: `1px solid ${theme.colors.border}` }} />))}                    </div>) : null}                </>) : (<Muted>Select a title to load details.</Muted>)}            </CardBody>          </Card>        </motion.div>) : null}    </AnimatePresence>); }
