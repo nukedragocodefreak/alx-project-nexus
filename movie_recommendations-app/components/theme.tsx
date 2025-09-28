@@ -135,7 +135,7 @@ const Grid = styled.div` display:grid; grid-template-columns: repeat(2,1fr); gap
 const PosterWrap = styled.div` position:relative; aspect-ratio:2/3; overflow:hidden; `;
 const Poster = styled.img` width:100%; height:100%; object-fit:cover; transition: transform .3s ease; ${PosterWrap}:hover & { transform: scale(1.05); }`;
 const Overlay = styled.div`
-  position:absolute; inset:0; display:flex; align-items:flex-end; justify-content:space-between; gap:8px; padding:12px; color:#fff;
+  position:absolute; inset:0; display:flex; align-items:flex-end; justify-content:space-between; gap:12px; padding:16px; color:#fff;
   background: linear-gradient(to top, rgba(0,0,0,.7), rgba(0,0,0,.1) 50%, transparent);
 `;
 const YearBadge = styled.span` background:#fff; color:#111; border-radius:999px; padding:2px 8px; font-size:12px; font-weight:700; `;

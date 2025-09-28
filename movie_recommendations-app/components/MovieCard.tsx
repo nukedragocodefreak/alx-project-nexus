@@ -23,7 +23,7 @@ const MovieCard: React.FC<MovieCardProps> = ({
       <PosterWrap>
         <Poster src={movie.poster} alt={movie.title} />
         <Overlay>
-          <div>
+          <div style={{ minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <YearBadge>{movie.year}</YearBadge>
               <Tiny>
@@ -41,7 +41,7 @@ const MovieCard: React.FC<MovieCardProps> = ({
             {meta ? <Tiny style={{ opacity: 0.9 }}>{meta}</Tiny> : null}
           </div>
 
-          <div style={{ display: "flex", gap: 6 }}>
+          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
             <Button
               size="icon"
               variant="outline"
@@ -66,8 +66,13 @@ const MovieCard: React.FC<MovieCardProps> = ({
               onClick={onInfo}
               disabled={!onInfo}
               aria-label="More details"
+              style={{
+                background: onInfo ? "#eef2ff" : undefined,
+                color: onInfo ? "#1d4ed8" : theme.colors.subtext,
+                borderColor: onInfo ? "#bfdbfe" : theme.colors.border,
+              }}
             >
-              <Info size={16} />
+              <Info size={16} strokeWidth={2.4} />
             </Button>
           </div>
         </Overlay>
@@ -83,3 +88,4 @@ const MovieCard: React.FC<MovieCardProps> = ({
 };
 
 export default MovieCard;
+
