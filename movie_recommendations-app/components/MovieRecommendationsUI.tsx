@@ -375,7 +375,7 @@ export default function MovieRecommendationsUI() {
       setDetailsLoading(true);
       setDetailsError(null);
       try {
-        const data = await fetchJSON(endpoint, { signal: controller.signal });
+        const data = await fetchJSON<TmdbDetails>(endpoint, { signal: controller.signal });
         setDetails(data);
       }
       catch (err: unknown) {
