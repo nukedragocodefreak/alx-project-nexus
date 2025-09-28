@@ -95,3 +95,17 @@ export type DetailsPanelProps = {
   onClose: () => void;
   posterBase: string;
 };
+
+export type EmptyStateProps = {
+  onClear: () => void;
+};
+
+export type FeedId = "popular" | "trending" | "now_playing" | "upcoming" | "discover" | "favorites" | "watchlist" | "search";
+
+export type FeedConfig = {
+  id: FeedId;
+  label: string;
+  icon?: React.ComponentType<{
+    size?: number;
+  }>;
+};
