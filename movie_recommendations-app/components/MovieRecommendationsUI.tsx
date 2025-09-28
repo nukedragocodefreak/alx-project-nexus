@@ -449,14 +449,14 @@ export default function MovieRecommendationsUI() {
   }
   const tabsToRender = useMemo(() => {
     if (activeFeed === "search" && query.trim()) {
-      return [...FEEDS, { id: "search", label: "Search" }];
+      return [...FEEDS, { id: "search", label: "Search", icon: undefined }];
     }
     return FEEDS;
   }, [activeFeed, query]);
   const posterPreviewBase = configuration?.images?.secure_base_url || TMDB_IMG_URL.replace("/w500", "/");
   const preferredPosterSize = configuration?.images?.poster_sizes?.find((size) => size === "w342") || configuration?.images?.poster_sizes?.[0] || "w500";
   return (<div>      <HeaderWrap>        <Container>          <Brand>            <AppBadge>              <Film size={20} />            </AppBadge>            <div>              <div style={{ fontWeight: 700 }}>SceneScout</div>              <Muted>Powered by TMDb</Muted>            </div>          </Brand>          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>            <Button size="sm" variant={feedMediaType === "movie" ? "solid" : "outline"} onClick={() => handleFeedMediaTypeChange("movie")}>              Movies            </Button>            <Button size="sm" variant={feedMediaType === "tv" ? "solid" : "outline"} onClick={() => handleFeedMediaTypeChange("tv")}>              TV            </Button>          </div>        </Container>        <Container style={{ paddingTop: 0 }}>          <InputWrap>            <LeftIcon>              <Search size={16} />            </LeftIcon>            <Input value={query} onChange={(event) => handleQueryChange(event.target.value)} placeholder="Search movies or TV shows" />            <RightShortcuts>              <Kbd>Ctrl</Kbd>              <Kbd>K</Kbd>            </RightShortcuts>          </InputWrap>          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>            <Button variant="outline">              <SlidersHorizontal size={16} /> Filters            </Button>            <Button onClick={() => handleQueryChange("")}>              <Sparkles size={16} /> Surprise me            </Button>          </div>        </Container>        <Container style={{ paddingTop: 8 }}>          <Tabs>            {tabsToRender.map((feed) => {
-    const Icon = "icon" in feed ? feed.icon : undefined;
+    const Icon = feed.icon;
     const isActive = activeFeed === feed.id;
     const disabled = feed.id === "search" && !query.trim();
     return (<TabBtn key={feed.id} active={isActive} onClick={() => {
