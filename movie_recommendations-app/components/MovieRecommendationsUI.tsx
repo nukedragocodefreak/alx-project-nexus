@@ -577,9 +577,7 @@ export default function MovieRecommendationsUI() {
   <Main> <div style={{ position: "sticky", top: 100, display: "grid", gap: 16, height: "fit-content" }}>          
     <Card>            
       <CardHeader>              
-        <CardTitle>Refine</CardTitle>              
-        <CardDescription>Tune the recommendation feed.
-          </CardDescription>            
+        <CardTitle>Filters</CardTitle>            
           </CardHeader>            
           <CardBody style={{ display: "grid", gap: 24 }}>             
             <div>                
