@@ -638,6 +638,29 @@ export default function MovieRecommendationsUI() {
                                                                                       </CardBody>           
                                                                                        </Card>)}          
                                                                   {error && <Danger>TMDb error: {error}</Danger>}
+          {effectiveTotalPages > 1 ? (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                disabled={page === 1}
+              >
+                Previous
+              </Button>
+              <div style={{ fontSize: 13, color: theme.colors.subtext }}>
+                Page {page} of {effectiveTotalPages}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((prev) => Math.min(effectiveTotalPages, prev + 1))}
+                disabled={page >= effectiveTotalPages}
+              >
+                Next
+              </Button>
+            </div>
+          ) : null}
           <AnimatePresence mode="popLayout">
             {loading ? (
               <Grid>
@@ -683,29 +706,6 @@ export default function MovieRecommendationsUI() {
               </Grid>
             )}
           </AnimatePresence>
-          {effectiveTotalPages > 1 ? (
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16 }}>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                disabled={page === 1}
-              >
-                Previous
-              </Button>
-              <div style={{ fontSize: 13, color: theme.colors.subtext }}>
-                Page {page} of {effectiveTotalPages}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((prev) => Math.min(effectiveTotalPages, prev + 1))}
-                disabled={page >= effectiveTotalPages}
-              >
-                Next
-              </Button>
-            </div>
-          ) : null}
         <DetailsPanel movie={selectedMovie} details={details} loading={detailsLoading} error={detailsError} onClose={() => setSelected(null)} posterBase={`${posterPreviewBase}${preferredPosterSize}`} />        </section>      </Main>    </div>);
 }
 
@@ -844,5 +844,6 @@ function DetailsPanel({ movie, details, loading, error, onClose, posterBase }: D
 }
 
 function EmptyState({ onClear }: EmptyStateProps) { return (<Card>      <CardBody style={{ minHeight: "30vh", display: "grid", placeItems: "center" }}>        <div style={{ maxWidth: 420, textAlign: "center", display: "grid", gap: 12 }}>          <div style={{ width: 56, height: 56, margin: "0 auto", display: "grid", placeItems: "center", border: `1px solid ${theme.colors.border}`, background: "#fff", borderRadius: 16, boxShadow: theme.shadow, }}>            <Search size={20} />          </div>          <div style={{ fontWeight: 700 }}>No matches just yet</div>          <div style={{ fontSize: 14, color: theme.colors.subtext }}>            Adjust your filters or try a different search term. You can also reset filters to start fresh.          </div>          <Button variant="outline" size="sm" onClick={onClear} style={{ width: "fit-content", margin: "0 auto" }}>            Reset filters          </Button>        </div>      </CardBody>    </Card>); }
+
 
 
