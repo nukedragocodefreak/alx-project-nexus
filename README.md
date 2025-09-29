@@ -1,4 +1,6 @@
-# Movie Recommendations App
+# Movie Recommendations App: 
+
+Vercel url for the site: https://alx-project-nexus-khaki-seven.vercel.app/
 
 An interactive Next.js and TypeScript application for exploring TMDb content, personalising feeds, and tracking favourites. The project doubles as a sandbox for modern frontend patterns, API orchestration, and developer experience tooling.
 
